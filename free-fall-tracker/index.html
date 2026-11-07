@@ -1,0 +1,873 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<meta charset="utf-8">
+<title>Free-Fall Tracker</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: video with the data table beside it; scale and results in a row below. One column on phones. */
+:root {
+  --bg: #EEF1F3; --panel: #FFFFFF; --ink: #17212B; --muted: #56636E; --line: #D3DAE0;
+  --accent: #0E6B74; --accent-ink: #FFFFFF; --accent-soft: #DCEDEF;
+  --mark: #E0287A; --scale: #13A6C2; --stage: #1B232B; --warn: #9A4A08;
+  --hcol: #FF8A1F; --vcol: #2E8BFF; --acol: #E8344E;
+  --f-display: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --f-body: "Barlow", "Segoe UI", system-ui, sans-serif;
+  --f-data: "JetBrains Mono", ui-monospace, "Consolas", monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #11171C; --panel: #18212A; --ink: #E4EAEF; --muted: #96A3AE; --line: #2B3843;
+  --accent: #46B6C0; --accent-ink: #06191C; --accent-soft: #173238;
+  --mark: #FF5AA0; --scale: #4FD3EA; --stage: #0A0E12; --warn: #F0A55A; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #11171C; --panel: #18212A; --ink: #E4EAEF; --muted: #96A3AE; --line: #2B3843;
+  --accent: #46B6C0; --accent-ink: #06191C; --accent-soft: #173238;
+  --mark: #FF5AA0; --scale: #4FD3EA; --stage: #0A0E12; --warn: #F0A55A; color-scheme: dark; }
+
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.45;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 14px 32px; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 20px; max-width: 1400px; margin: 0 auto 14px; }
+h1 { font-family: var(--f-display); font-weight: 600; font-size: 1.9rem; letter-spacing: .01em; margin: 0; line-height: 1; }
+h2 { font-family: var(--f-display); font-weight: 600; font-size: 1.15rem; letter-spacing: .04em; text-transform: uppercase; margin: 0; color: var(--muted); }
+h3 { font-size: .9rem; font-weight: 600; margin: 0; color: var(--muted); }
+label.inline { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+select, input[type=number] { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+input[type=number] { width: 6.5em; font-family: var(--f-data); }
+button { font: inherit; font-weight: 500; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.primary, button[aria-pressed=true] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button:disabled { opacity: .45; cursor: default; }
+
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; grid-template-areas: "viewer data" "below below"; gap: 18px; max-width: 1400px; margin: 0 auto; align-items: start; }
+.viewer { grid-area: viewer; min-width: 0; }
+.datacol { grid-area: data; min-width: 0; }
+.below { grid-area: below; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; align-items: start; min-width: 0; }
+@media (max-width: 680px) { .layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "viewer" "data" "below"; } }
+
+.tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
+.hint { margin: 10px 0 0; padding: 8px 12px; border-radius: 6px; background: var(--accent-soft); color: var(--ink); font-size: .95rem; }
+.stage { background: var(--stage); border-radius: 10px; display: flex; justify-content: center; align-items: center; padding: 10px; min-height: 260px; position: relative; }
+.wrap { position: relative; display: inline-block; line-height: 0; }
+#frame { display: block; max-width: 100%; max-height: 72vh; height: auto; width: auto; transition: filter .25s; }
+#frame.desat { filter: saturate(.08) brightness(1.04); }
+#overlay { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+#overlay.viewing { cursor: default; }
+#loupe { position: absolute; width: 150px; height: 150px; border-radius: 50%; border: 3px solid var(--panel); box-shadow: 0 4px 16px rgba(0,0,0,.45); pointer-events: none; }
+#stageMsg { color: #E4EAEF; max-width: 34em; text-align: center; padding: 30px 16px; line-height: 1.5; }
+#stageMsg code { font-family: var(--f-data); font-size: .9em; }
+.key { display: inline-flex; align-items: center; gap: 6px; font-size: .9rem; color: var(--muted); }
+.dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.35); }
+
+.check { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; font-size: .92rem; cursor: pointer; }
+.check input { accent-color: var(--accent); width: 16px; height: 16px; }
+.swatch { width: 14px; height: 4px; border-radius: 2px; background: var(--acol); }
+.transport { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 10px; }
+.transport input[type=range] { flex: 1 1 200px; min-width: 0; accent-color: var(--accent); }
+.readout { font-family: var(--f-data); font-size: .88rem; font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.muted { color: var(--muted); font-size: .9rem; }
+.results { display: flex; flex-wrap: wrap; gap: 8px 28px; align-items: flex-end; }
+.big { font-family: var(--f-display); font-weight: 600; font-size: 2.6rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.big small { font-size: 1.1rem; color: var(--muted); margin-left: 4px; }
+.big-label { font-size: .85rem; color: var(--muted); font-weight: 500; }
+.warn { color: var(--warn); font-size: .9rem; }
+.fit { font-family: var(--f-data); font-size: .85rem; color: var(--muted); overflow-wrap: anywhere; }
+.graph { width: 100%; height: 190px; display: block; }
+
+.tablebox { max-height: 62vh; min-height: 160px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; }
+table { width: 100%; border-collapse: collapse; font-family: var(--f-data); font-size: .82rem; font-variant-numeric: tabular-nums; }
+th { position: sticky; top: 0; background: var(--panel); text-align: right; font-weight: 500; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { text-align: right; padding: 4px 8px; border-bottom: 1px solid var(--line); }
+tbody tr { cursor: pointer; }
+tbody tr:hover td { background: var(--accent-soft); }
+tr.current td { background: var(--accent-soft); font-weight: 500; }
+#copyFallback { width: 100%; height: 90px; font-family: var(--f-data); font-size: .8rem; }
+
+details { border-top: 1px solid var(--line); padding-top: 10px; }
+summary { cursor: pointer; font-weight: 600; color: var(--accent); }
+summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.explain-body { max-width: 62ch; }
+.explain-body p, .explain-body ul { margin: 10px 0 0; }
+.explain-body ul { padding-left: 1.2em; display: flex; flex-direction: column; gap: 4px; }
+.eq { font-family: var(--f-data); font-size: 1.05rem; text-align: center; background: var(--accent-soft); border-radius: 6px; padding: 8px; }
+.eq-inline { font-family: var(--f-data); white-space: nowrap; }
+.yours { background: var(--accent-soft); border-radius: 6px; padding: 10px 12px; font-variant-numeric: tabular-nums; }
+#videoHolder { position: fixed; left: 0; top: 0; width: 2px; height: 2px; opacity: 0; pointer-events: none; overflow: hidden; }
+@media (prefers-reduced-motion: reduce) { #frame { transition: none; } }
+</style>
+
+<header>
+  <h1>Free-Fall Tracker</h1>
+  <label class="inline" for="videoSelect">Video <select id="videoSelect"></select></label>
+  <p class="warn" id="listMsg" hidden style="flex-basis: 100%; margin: 0; text-align: right;"></p>
+</header>
+
+<main class="layout">
+  <section class="viewer">
+    <div class="tools">
+      <button id="toolScale" aria-pressed="true">1 · Set scale</button>
+      <button id="toolMark" aria-pressed="false">2 · Mark ball</button>
+      <button id="toolViz" aria-pressed="false" hidden>3 · Visualize</button>
+    </div>
+    <div class="stage">
+      <div class="wrap" id="wrap">
+        <canvas id="frame" width="540" height="960"></canvas>
+        <canvas id="overlay" width="540" height="960" aria-label="Video frame. Click to place points."></canvas>
+        <canvas id="loupe" hidden></canvas>
+      </div>
+      <div id="stageMsg" hidden></div>
+    </div>
+    <p class="hint" id="hint" aria-live="polite"></p>
+    <div class="transport">
+      <button id="prev" aria-label="Previous frame">‹ Back</button>
+      <button id="play" hidden>Play</button>
+      <button id="next" aria-label="Next frame">Next ›</button>
+      <input type="range" id="scrub" min="0" max="0" value="0" aria-label="Frame">
+      <span class="readout" id="frameReadout">Frame 0</span>
+      <label class="inline" for="stepSelect"><span class="muted">Step</span>
+        <select id="stepSelect">
+          <option value="1">1 frame</option><option value="2">2 frames</option><option value="3" selected>3 frames</option>
+          <option value="4">4 frames</option><option value="5">5 frames</option><option value="10">10 frames</option>
+        </select>
+      </label>
+    </div>
+    <div id="vizKey" hidden style="margin-top: 8px; display: flex; flex-direction: column; gap: 6px;">
+      <div class="row">
+        <span class="key"><span class="dot" style="background: var(--hcol)"></span>Horizontal motion</span>
+        <span class="key"><span class="dot" style="background: var(--vcol)"></span>Vertical motion</span>
+        <span class="muted">Grid squares are 10 cm.</span>
+      </div>
+      <div class="row">
+        <label class="check" for="showVel"><input type="checkbox" id="showVel" checked> Velocity arrows <span class="muted">(1 square = 1 m/s)</span></label>
+        <label class="check" for="showAcc"><input type="checkbox" id="showAcc" checked> <span class="swatch"></span>Acceleration arrow <span class="muted">(1 square = 5 m/s²)</span></label>
+      </div>
+    </div>
+  </section>
+
+  <aside class="datacol">
+    <div class="card">
+      <div class="row" style="justify-content: space-between;">
+        <h2>Data</h2>
+        <span class="muted" id="countText">0 points</span>
+      </div>
+      <div class="muted">Mark only while the ball is flying freely: start after it has been released, and stop before it hits the floor or anything else. The first marked point is the origin. Up and right are positive.</div>
+      <div class="tablebox">
+        <table>
+          <thead id="thead"></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div class="row">
+        <button id="copyData">Copy data</button>
+        <button id="removeMark">Remove this frame's mark</button>
+        <button id="clearMarks">Clear all marks</button>
+      </div>
+      <textarea id="copyFallback" hidden readonly aria-label="Data to copy"></textarea>
+    </div>
+  </aside>
+
+  <div class="below">
+    <div class="card">
+      <h2>Scale</h2>
+      <div class="row">
+        <label class="inline" for="scaleLen">Line length <input type="number" id="scaleLen" value="1.00" min="0.01" step="0.01"> m</label>
+      </div>
+      <div class="muted" id="scaleReadout">No scale line yet.</div>
+      <div class="row"><button id="clearScale">Redraw scale</button></div>
+    </div>
+
+    <div class="card">
+      <h2>Result</h2>
+      <div class="results">
+        <div><div class="big-label">g</div><div class="big" id="gValue">—<small>m/s²</small></div></div>
+        <div id="vxBox" hidden><div class="big-label">Horizontal velocity</div><div class="big" id="vxValue">—<small>m/s</small></div></div>
+      </div>
+      <div class="fit" id="fitText">Mark at least 3 frames to fit a curve.</div>
+      <div class="fit" id="fitTextX" hidden></div>
+      <h3 id="graphXTitle" hidden>Horizontal position vs. time</h3>
+      <canvas class="graph" id="graphX" hidden aria-label="Graph of horizontal position versus time"></canvas>
+      <h3 id="graphYTitle">Vertical position vs. time</h3>
+      <canvas class="graph" id="graphY" aria-label="Graph of vertical position versus time"></canvas>
+
+      <details id="explain">
+        <summary>How is g found from my data?</summary>
+        <div class="explain-body">
+          <div id="explainFall">
+            <p>While the ball falls, gravity speeds it up at a constant rate. When acceleration is constant, position changes with time according to this equation:</p>
+            <p class="eq">y = y₀ + v₀t + ½at²</p>
+            <p>The app finds the curve <span class="eq-inline">y = At² + Bt + C</span> that comes closest to all of your points. That's the line drawn on the graph. It picks A, B, and C so that the vertical gaps between the curve and your points, squared and added up, are as small as possible.</p>
+            <p>Matching the two equations term by term:</p>
+            <ul>
+              <li><b>C</b> matches y₀, the starting position. It comes out near 0 because your first mark is the origin.</li>
+              <li><b>B</b> matches v₀, the ball's velocity at your first mark. It isn't 0 because you started marking after the ball was already falling.</li>
+              <li><b>A</b> matches ½a. So the acceleration is a = 2A.</li>
+            </ul>
+          </div>
+          <div id="explainProj" hidden>
+            <p>A thrown ball's motion can be split into a horizontal part and a vertical part. The two happen at the same time without affecting each other.</p>
+            <p><b>Horizontal.</b> After the ball leaves the hand, nothing pushes it sideways (ignoring air resistance), so it moves sideways at a steady speed:</p>
+            <p class="eq">x = x₀ + vₓt</p>
+            <p>The app fits a straight line <span class="eq-inline">x = Dt + E</span> to your horizontal positions. The slope D is the horizontal velocity, vₓ.</p>
+            <p><b>Vertical.</b> Gravity speeds the ball up downward at a constant rate, exactly as it does for a dropped ball:</p>
+            <p class="eq">y = y₀ + v₀t + ½at²</p>
+            <p>The app fits the curve <span class="eq-inline">y = At² + Bt + C</span>, choosing A, B, and C so that the vertical gaps between the curve and your points, squared and added up, are as small as possible. Matching the two equations term by term:</p>
+            <ul>
+              <li><b>C</b> matches y₀, the starting position, near 0 because your first mark is the origin.</li>
+              <li><b>B</b> matches v₀, the ball's vertical velocity at your first mark. Positive means it was still rising.</li>
+              <li><b>A</b> matches ½a. So the acceleration is a = 2A.</li>
+            </ul>
+          </div>
+          <p id="explainYours" class="yours"></p>
+        </div>
+      </details>
+    </div>
+  </div>
+</main>
+<div id="videoHolder"></div>
+
+<script>
+/* ============================================================
+   VIDEO LIST
+   The app reads its videos from a videos.json file in your Cloudflare R2
+   bucket, so new videos never require redeploying this page.
+   Paste the full web address of that file between the quotes below.
+   Each entry in videos.json looks like this:
+     { "name": "Drop 1", "file": "drop-1.mp4", "fps": 30, "captureFps": 30, "step": 1, "motion": "fall" }
+   file:       the video's file name in the bucket (or a full web address).
+   fps:        frames per second stored IN THE FILE (what HandBrake reports).
+   captureFps: the real frame rate the camera recorded at. For a slow-motion
+               clip saved as a slowed-down 30 fps file, fps = 30 and captureFps = 240.
+   motion:     "fall" for a dropped object, "projectile" for a thrown one.
+   step:       (optional) frames to advance per click. Default 3; use 1 for 30 fps clips.
+   ============================================================ */
+const VIDEO_LIST_URL = "https://pub-5774f50f24e84298bcecc87dc3230d23.r2.dev/videos.json";
+
+const VIDEOS = [
+  { name: "Demo: dropped ball (built in)", demo: "fall" },
+  { name: "Demo: thrown ball (built in)", demo: "projectile" },
+];
+
+const $ = id => document.getElementById(id);
+const frameCv = $("frame"), fctx = frameCv.getContext("2d");
+const overlay = $("overlay"), octx = overlay.getContext("2d");
+const loupe = $("loupe"), lctx = loupe.getContext("2d");
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+let source = null, frame = 0, mode = "scale", loadToken = 0, fitState = null, playing = false;
+let scale = { a: null, b: null };
+const marks = new Map();
+const isProj = () => source && source.motion === "projectile";
+
+/* ---------- Built-in demos ---------- */
+function makeFallDemo() {
+  // Simulated 120 fps clip of a ball dropped beside a meter stick. g = 9.80 m/s².
+  const W = 540, H = 960, FPS = 120, PXM = 700, top = 120, y0 = 150, floorY = 880, R = 22, tRel = 10.37 / FPS;
+  return {
+    width: W, height: H, frames: 75, fps: FPS, captureFps: FPS, motion: "fall",
+    draw(ctx, n) {
+      const g = ctx.createLinearGradient(0, 0, W, 0);
+      g.addColorStop(0, "#C9C4B8"); g.addColorStop(1, "#B9B3A6");
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = "#6E6457"; ctx.fillRect(0, floorY, W, H - floorY);
+      ctx.fillStyle = "#5A5147"; ctx.fillRect(0, floorY, W, 4);
+      ctx.fillStyle = "#E3C35A"; ctx.fillRect(150, top - 10, 44, PXM + 20);
+      ctx.strokeStyle = "#8A6E1E"; ctx.lineWidth = 1; ctx.strokeRect(150.5, top - 9.5, 43, PXM + 19);
+      ctx.fillStyle = "#2A2418"; ctx.font = "13px sans-serif"; ctx.textAlign = "right";
+      for (let cm = 0; cm <= 100; cm++) {
+        const y = top + cm * PXM / 100, len = cm % 10 === 0 ? 18 : cm % 5 === 0 ? 12 : 7;
+        ctx.fillRect(194 - len, y - 0.5, len, 1);
+        if (cm % 10 === 0) ctx.fillText(String(cm), 172, y + 4);
+      }
+      const t = n / FPS, dt = Math.max(0, t - tRel);
+      const y = Math.min(y0 + 0.5 * 9.80 * PXM * dt * dt, floorY - R), x = 330;
+      ctx.fillStyle = "rgba(0,0,0,.18)"; ctx.beginPath(); ctx.ellipse(x, floorY + 3, R * (0.6 + 0.4 * (y - y0) / (floorY - R - y0)), 5, 0, 0, 7); ctx.fill();
+      const bg = ctx.createRadialGradient(x - 7, y - 8, 3, x, y, R);
+      bg.addColorStop(0, "#FF9A6B"); bg.addColorStop(1, "#B8341B");
+      ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(x, y, R, 0, 7); ctx.fill();
+    }
+  };
+}
+
+function makeProjectileDemo() {
+  // Simulated 120 fps clip of a ball launched at vx = 2.50 m/s, vy = 2.60 m/s. g = 9.80 m/s².
+  const W = 960, H = 540, FPS = 120, PXM = 400, x0 = 180, y0 = 330, R = 14, floorY = 470, tRel = 8.37 / FPS;
+  const VX = 2.5, VY = 2.6, drop = (floorY - R - y0) / PXM;
+  const tLand = (VY + Math.sqrt(VY * VY + 2 * 9.8 * drop)) / 9.8;
+  return {
+    width: W, height: H, frames: 100, fps: FPS, captureFps: FPS, motion: "projectile",
+    draw(ctx, n) {
+      const g = ctx.createLinearGradient(0, 0, 0, floorY);
+      g.addColorStop(0, "#CFCABD"); g.addColorStop(1, "#BDB6A8");
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, floorY);
+      ctx.fillStyle = "#6E6457"; ctx.fillRect(0, floorY, W, H - floorY);
+      ctx.fillStyle = "#5A5147"; ctx.fillRect(0, floorY, W, 4);
+      // meter stick on the wall
+      const sx = 180, sy = 60;
+      ctx.fillStyle = "#E3C35A"; ctx.fillRect(sx - 10, sy, PXM + 20, 32);
+      ctx.strokeStyle = "#8A6E1E"; ctx.lineWidth = 1; ctx.strokeRect(sx - 9.5, sy + 0.5, PXM + 19, 31);
+      ctx.fillStyle = "#2A2418"; ctx.font = "12px sans-serif"; ctx.textAlign = "center";
+      for (let cm = 0; cm <= 100; cm++) {
+        const x = sx + cm * PXM / 100, len = cm % 10 === 0 ? 14 : cm % 5 === 0 ? 9 : 5;
+        ctx.fillRect(x - 0.5, sy + 32 - len, 1, len);
+        if (cm % 10 === 0) ctx.fillText(String(cm), x, sy + 13);
+      }
+      // launch stand
+      ctx.fillStyle = "#7B8088"; ctx.fillRect(x0 - 4, y0 + R, 8, floorY - y0 - R);
+      ctx.fillRect(x0 - 16, y0 + R - 2, 32, 5);
+      // ball
+      const t = n / FPS, dt = Math.min(Math.max(0, t - tRel), tLand);
+      const x = x0 + VX * PXM * dt, y = y0 - (VY * dt - 4.9 * dt * dt) * PXM;
+      const h = (floorY - R - y) / (floorY - R - (y0 - VY * VY / 19.6 * PXM));
+      ctx.fillStyle = "rgba(0,0,0,.16)"; ctx.beginPath(); ctx.ellipse(x, floorY + 3, R * (1 - 0.4 * Math.max(0, Math.min(1, h))), 4, 0, 0, 7); ctx.fill();
+      const bg = ctx.createRadialGradient(x - 5, y - 5, 2, x, y, R);
+      bg.addColorStop(0, "#9FE07A"); bg.addColorStop(1, "#2E7D1F");
+      ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(x, y, R, 0, 7); ctx.fill();
+    }
+  };
+}
+
+function makeVideo(cfg) {
+  return new Promise((resolve, reject) => {
+    const v = document.createElement("video");
+    v.muted = true; v.playsInline = true; v.preload = "auto";
+    $("videoHolder").replaceChildren(v);
+    v.addEventListener("error", () => reject(new Error("load")), { once: true });
+    v.addEventListener("loadeddata", () => {
+      const fps = cfg.fps, frames = Math.max(1, Math.floor(v.duration * fps + 0.01));
+      resolve({
+        width: v.videoWidth, height: v.videoHeight, frames, fps, captureFps: cfg.captureFps || fps, motion: cfg.motion || "fall",
+        async draw(ctx, n) {
+          // Seek to the middle of frame n so we never land on a frame boundary.
+          const t = Math.min((n + 0.5) / fps, v.duration - 0.0005);
+          if (Math.abs(v.currentTime - t) > 1e-4) {
+            await new Promise(res => { v.addEventListener("seeked", res, { once: true }); v.currentTime = t; });
+            if (v.requestVideoFrameCallback) {
+              await Promise.race([new Promise(r => v.requestVideoFrameCallback(() => r())), new Promise(r => setTimeout(r, 150))]);
+            }
+          }
+          ctx.drawImage(v, 0, 0, v.videoWidth, v.videoHeight);
+        }
+      });
+    }, { once: true });
+    v.src = cfg.src;
+  });
+}
+
+async function loadSource(i) {
+  const token = ++loadToken, cfg = VIDEOS[i];
+  stopPlay();
+  marks.clear(); scale = { a: null, b: null }; frame = 0; source = null; fitState = null;
+  $("stepSelect").value = String(cfg.step || 3);
+  setMode("scale");
+  $("stageMsg").hidden = true; $("wrap").hidden = false;
+  try {
+    const s = cfg.demo === "fall" ? makeFallDemo() : cfg.demo === "projectile" ? makeProjectileDemo() : await makeVideo(cfg);
+    if (token !== loadToken) return;
+    source = s;
+    frameCv.width = overlay.width = s.width; frameCv.height = overlay.height = s.height;
+    $("scrub").max = s.frames - 1; $("scrub").value = 0;
+    applyMotionLayout();
+    await showFrame(0);
+  } catch (e) {
+    if (token !== loadToken) return;
+    $("wrap").hidden = true; $("stageMsg").hidden = false;
+    $("stageMsg").innerHTML = `Couldn't load <code>${cfg.src}</code>.<br><br>Check that the file name in videos.json matches the file in the bucket exactly, including capital letters.`;
+  }
+  updateAll();
+}
+
+function applyMotionLayout() {
+  const p = isProj();
+  $("toolViz").hidden = !p;
+  $("vxBox").hidden = !p; $("fitTextX").hidden = !p;
+  $("graphX").hidden = !p; $("graphXTitle").hidden = !p;
+  $("explainFall").hidden = p; $("explainProj").hidden = !p;
+  $("thead").innerHTML = p ? "<tr><th>Frame</th><th>t (s)</th><th>x (m)</th><th>y (m)</th></tr>" : "<tr><th>Frame</th><th>t (s)</th><th>y (m)</th></tr>";
+}
+
+/* ---------- Frame display ---------- */
+let busy = false, want = 0;
+async function showFrame(n) {
+  if (!source) return;
+  want = Math.max(0, Math.min(source.frames - 1, n));
+  frame = want; $("scrub").value = frame; updateAll();
+  if (busy) return;
+  busy = true;
+  try {
+    while (true) {
+      const target = want;
+      await source.draw(fctx, target);
+      if (want === target) break;
+    }
+  } finally { busy = false; }
+  renderOverlay();
+}
+const go = n => showFrame(n);
+const step = () => +$("stepSelect").value;
+
+/* ---------- Geometry helpers ---------- */
+const dist = (p, q) => Math.hypot(p.x - q.x, p.y - q.y);
+function k() { const w = overlay.getBoundingClientRect().width; return w ? overlay.width / w : 1; }
+function toNative(e) {
+  const r = overlay.getBoundingClientRect();
+  return { x: (e.clientX - r.left) * overlay.width / r.width, y: (e.clientY - r.top) * overlay.height / r.height };
+}
+function pxPerMeter() {
+  const L = parseFloat($("scaleLen").value);
+  if (!scale.a || !scale.b || !(L > 0)) return null;
+  const d = dist(scale.a, scale.b);
+  return d > 0 ? d / L : null;
+}
+
+/* ---------- Overlay drawing ---------- */
+function renderOverlay() {
+  const K = k();
+  octx.clearRect(0, 0, overlay.width, overlay.height);
+  if (mode === "viz") { if (fitState) drawViz(K); return; }
+  const scaleCol = css("--scale"), markCol = css("--mark");
+  if (scale.a) {
+    const a = scale.a, b = scale.b;
+    octx.lineCap = "round";
+    if (b) {
+      const ang = Math.atan2(b.y - a.y, b.x - a.x), nx = -Math.sin(ang) * 9 * K, ny = Math.cos(ang) * 9 * K;
+      for (const [w, c] of [[5 * K, "rgba(0,0,0,.6)"], [2.5 * K, scaleCol]]) {
+        octx.strokeStyle = c; octx.lineWidth = w; octx.beginPath();
+        octx.moveTo(a.x, a.y); octx.lineTo(b.x, b.y);
+        for (const p of [a, b]) { octx.moveTo(p.x - nx, p.y - ny); octx.lineTo(p.x + nx, p.y + ny); }
+        octx.stroke();
+      }
+      const L = parseFloat($("scaleLen").value);
+      const label = (L > 0 ? L.toFixed(2) : "?") + " m";
+      octx.font = `600 ${14 * K}px Barlow, sans-serif`;
+      const mx = (a.x + b.x) / 2 + 14 * K * Math.abs(Math.cos(ang)) * 0 + 14 * K, my = (a.y + b.y) / 2 + (Math.abs(Math.cos(ang)) > 0.7 ? 24 * K : 0);
+      octx.lineWidth = 4 * K; octx.strokeStyle = "rgba(0,0,0,.75)"; octx.strokeText(label, mx, my);
+      octx.fillStyle = scaleCol; octx.fillText(label, mx, my);
+    }
+    for (const p of [a, b]) if (p) {
+      octx.fillStyle = scaleCol; octx.strokeStyle = "rgba(0,0,0,.7)"; octx.lineWidth = 2 * K;
+      octx.beginPath(); octx.arc(p.x, p.y, 5 * K, 0, 7); octx.fill(); octx.stroke();
+    }
+  }
+  for (const [f, p] of marks) {
+    const cur = f === frame;
+    octx.strokeStyle = "rgba(0,0,0,.7)"; octx.lineWidth = 1.5 * K; octx.fillStyle = markCol;
+    octx.globalAlpha = cur ? 1 : 0.75;
+    octx.beginPath(); octx.arc(p.x, p.y, (cur ? 4 : 3) * K, 0, 7); octx.fill(); octx.stroke();
+    if (cur) {
+      octx.strokeStyle = markCol; octx.lineWidth = 2 * K;
+      octx.beginPath(); octx.arc(p.x, p.y, 11 * K, 0, 7); octx.stroke();
+    }
+    octx.globalAlpha = 1;
+  }
+}
+
+function drawViz(K) {
+  const { p0, ppm, fx, fy, f0, tLast, ts, fps } = fitState;
+  const W = overlay.width, H = overlay.height, s = 0.1 * ppm;
+  // 10 cm grid anchored at the origin (first mark)
+  octx.lineWidth = 1 * K;
+  for (let i = Math.floor(-p0.x / s); i <= Math.ceil((W - p0.x) / s); i++) {
+    const x = p0.x + i * s;
+    octx.strokeStyle = i === 0 ? "rgba(255,255,255,.85)" : i % 5 === 0 ? "rgba(255,255,255,.5)" : "rgba(255,255,255,.28)";
+    octx.lineWidth = (i === 0 ? 2 : 1) * K;
+    octx.beginPath(); octx.moveTo(x, 0); octx.lineTo(x, H); octx.stroke();
+  }
+  for (let j = Math.floor(-p0.y / s); j <= Math.ceil((H - p0.y) / s); j++) {
+    const y = p0.y + j * s;
+    octx.strokeStyle = j === 0 ? "rgba(255,255,255,.85)" : j % 5 === 0 ? "rgba(255,255,255,.5)" : "rgba(255,255,255,.28)";
+    octx.lineWidth = (j === 0 ? 2 : 1) * K;
+    octx.beginPath(); octx.moveTo(0, y); octx.lineTo(W, y); octx.stroke();
+  }
+  const t = (frame - f0) / fps;
+  if (t < -1e-9) return;
+  const tc = Math.min(t, tLast);
+  const X = tt => p0.x + (fx.D * tt + fx.E) * ppm;
+  const Y = tt => p0.y - (fy.A * tt * tt + fy.B * tt + fy.C) * ppm;
+  const hcol = css("--hcol"), vcol = css("--vcol");
+  const shadowOn = () => { octx.shadowColor = "rgba(0,0,0,.55)"; octx.shadowBlur = 6 * K; octx.shadowOffsetX = 0; octx.shadowOffsetY = 2 * K; };
+  const shadowOff = () => { octx.shadowColor = "transparent"; octx.shadowBlur = 0; octx.shadowOffsetY = 0; };
+  // trail dots at the student's marked times: translucent fill, white outline, drop shadow
+  for (const ti of ts) {
+    if (ti > tc + 1e-9) break;
+    for (const [px, py, c] of [[X(ti), p0.y, hcol], [p0.x, Y(ti), vcol]]) {
+      shadowOn();
+      octx.globalAlpha = 0.55; octx.fillStyle = c;
+      octx.beginPath(); octx.arc(px, py, 6 * K, 0, 7); octx.fill();
+      shadowOff();
+      octx.globalAlpha = 0.9; octx.strokeStyle = "#fff"; octx.lineWidth = 1.5 * K;
+      octx.stroke();
+    }
+  }
+  octx.globalAlpha = 1;
+  const bx = X(tc), by = Y(tc);
+  // dashed guides from each circle to the ball
+  octx.setLineDash([5 * K, 4 * K]); octx.lineWidth = 1.5 * K; octx.strokeStyle = "rgba(255,255,255,.8)";
+  octx.beginPath(); octx.moveTo(bx, p0.y); octx.lineTo(bx, by); octx.moveTo(p0.x, by); octx.lineTo(bx, by); octx.stroke();
+  octx.setLineDash([]);
+  octx.strokeStyle = "rgba(255,255,255,.9)"; octx.lineWidth = 2 * K;
+  octx.beginPath(); octx.arc(bx, by, 5 * K, 0, 7); octx.stroke();
+  // the two tracking circles
+  for (const [px, py, c] of [[bx, p0.y, hcol], [p0.x, by, vcol]]) {
+    shadowOn();
+    octx.fillStyle = c; octx.beginPath(); octx.arc(px, py, 11 * K, 0, 7); octx.fill();
+    shadowOff();
+    octx.strokeStyle = "#fff"; octx.lineWidth = 2.5 * K; octx.stroke();
+  }
+  // Velocity and acceleration arrows, from the fitted equations.
+  // Lengths are tied to the grid: 1 square (10 cm) = 1 m/s for velocity, 5 m/s² for acceleration.
+  const vx = fx.D, vy = 2 * fy.A * tc + fy.B, ay = 2 * fy.A;
+  const vScale = 0.1 * ppm, aScale = 0.1 * ppm / 5;
+  if ($("showVel").checked) {
+    drawArrow(bx, p0.y, vx * vScale, 0, hcol, `${Math.abs(vx).toFixed(2)} m/s`, K);
+    drawArrow(p0.x, by, 0, -vy * vScale, vcol, `${Math.abs(vy).toFixed(2)} m/s`, K);
+    drawArrow(bx, by, vx * vScale, -vy * vScale, "#FFFFFF", `${Math.hypot(vx, vy).toFixed(2)} m/s`, K);
+  }
+  // acceleration label goes on the side away from the direction of travel, clear of the velocity arrows
+  if ($("showAcc").checked) drawArrow(bx, by, 0, -ay * aScale, css("--acol"), `${Math.abs(ay).toFixed(2)} m/s²`, K, vx >= 0 ? "left" : "right");
+}
+
+function drawArrow(x, y, dx, dy, color, label, K, side) {
+  const len = Math.hypot(dx, dy), start = 12 * K;
+  let tipX = x, tipY = y;
+  if (len > start + 6 * K) {
+    // start the shaft at the edge of the circle so the arrow doesn't hide it
+    const ux = dx / len, uy = dy / len, head = Math.min(14 * K, len * 0.4);
+    const sx = x + ux * start, sy = y + uy * start;
+    tipX = x + dx; tipY = y + dy;
+    octx.shadowColor = "rgba(0,0,0,.6)"; octx.shadowBlur = 5 * K; octx.shadowOffsetY = 1.5 * K;
+    octx.strokeStyle = color; octx.fillStyle = color; octx.lineWidth = 3.5 * K; octx.lineCap = "round";
+    octx.beginPath(); octx.moveTo(sx, sy); octx.lineTo(tipX - ux * head * 0.8, tipY - uy * head * 0.8); octx.stroke();
+    octx.beginPath(); octx.moveTo(tipX, tipY);
+    octx.lineTo(tipX - ux * head - uy * head * 0.5, tipY - uy * head + ux * head * 0.5);
+    octx.lineTo(tipX - ux * head + uy * head * 0.5, tipY - uy * head - ux * head * 0.5);
+    octx.closePath(); octx.fill();
+    octx.shadowColor = "transparent"; octx.shadowBlur = 0; octx.shadowOffsetY = 0;
+  }
+  // value label beside the tip
+  octx.font = `600 ${13 * K}px Barlow, sans-serif`;
+  let lx, ly;
+  if (Math.abs(dx) >= Math.abs(dy) && len > 1) { lx = tipX + Math.sign(dx) * 8 * K; ly = tipY - 12 * K; octx.textAlign = dx >= 0 ? "left" : "right"; }
+  else { const left = side === "left"; lx = tipX + (left ? -14 : 14) * K; ly = tipY + (len > 1 ? Math.sign(dy) * 4 * K : 0); octx.textAlign = left ? "right" : "left"; }
+  octx.textBaseline = "middle";
+  octx.lineJoin = "round"; octx.lineWidth = 4 * K; octx.strokeStyle = "rgba(0,0,0,.75)"; octx.strokeText(label, lx, ly);
+  octx.fillStyle = color === "#FFFFFF" ? "#FFFFFF" : color; octx.fillText(label, lx, ly);
+  octx.textAlign = "start"; octx.textBaseline = "alphabetic";
+}
+
+/* ---------- Magnifier ---------- */
+const LOUPE_CSS = 150, ZOOM = 4;
+function showLoupe(e, p) {
+  if (mode === "viz") return;
+  const r = overlay.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  if (loupe.width !== LOUPE_CSS * dpr) { loupe.width = loupe.height = LOUPE_CSS * dpr; }
+  const s = r.width / overlay.width, src = LOUPE_CSS / (s * ZOOM), L = loupe.width;
+  lctx.imageSmoothingEnabled = false;
+  lctx.fillStyle = "#000"; lctx.fillRect(0, 0, L, L);
+  lctx.drawImage(frameCv, p.x - src / 2, p.y - src / 2, src, src, 0, 0, L, L);
+  lctx.drawImage(overlay, p.x - src / 2, p.y - src / 2, src, src, 0, 0, L, L);
+  lctx.strokeStyle = "rgba(255,255,255,.9)"; lctx.lineWidth = dpr;
+  lctx.beginPath(); lctx.moveTo(L / 2, L * 0.3); lctx.lineTo(L / 2, L * 0.7); lctx.moveTo(L * 0.3, L / 2); lctx.lineTo(L * 0.7, L / 2); lctx.stroke();
+  lctx.strokeStyle = "rgba(0,0,0,.6)"; lctx.strokeRect(L / 2 - 1.5 * dpr, L / 2 - 1.5 * dpr, 3 * dpr, 3 * dpr);
+  let x = e.clientX - r.left + 28, y = e.clientY - r.top - LOUPE_CSS - 28;
+  if (x + LOUPE_CSS > r.width) x = e.clientX - r.left - LOUPE_CSS - 28;
+  if (y < 0) y = e.clientY - r.top + 28;
+  loupe.style.left = x + "px"; loupe.style.top = y + "px"; loupe.hidden = false;
+}
+const hideLoupe = () => { loupe.hidden = true; };
+
+/* ---------- Pointer input ---------- */
+let pressing = false, drag = null;
+overlay.addEventListener("pointerdown", e => {
+  if (!source || mode === "viz") return;
+  e.preventDefault(); overlay.setPointerCapture(e.pointerId);
+  const p = toNative(e), grab = 16 * k();
+  pressing = true; drag = null;
+  if (mode === "scale") {
+    if (scale.a && dist(p, scale.a) < grab) drag = "a";
+    else if (scale.b && dist(p, scale.b) < grab) drag = "b";
+  }
+  showLoupe(e, p);
+});
+overlay.addEventListener("pointermove", e => {
+  if (!source || mode === "viz") return;
+  const p = toNative(e);
+  if (drag) { scale[drag] = p; renderOverlay(); updateAll(); }
+  if (pressing || e.pointerType === "mouse") showLoupe(e, p);
+});
+overlay.addEventListener("pointerup", e => {
+  if (!source || !pressing || mode === "viz") return;
+  const p = toNative(e);
+  if (mode === "scale" && !drag) {
+    if (!scale.a) scale.a = p;
+    else if (!scale.b) scale.b = p;
+  } else if (mode === "mark") {
+    // Clicking this frame's own mark removes it. Any other click places (or moves) this frame's mark and advances.
+    // Marks on other frames are never removed by a click, because early in the motion they sit right next to the ball.
+    const own = marks.get(frame);
+    if (own && dist(p, own) < 8 * k()) marks.delete(frame);
+    else {
+      marks.set(frame, p);
+      if (frame + step() <= source.frames - 1) go(frame + step());
+    }
+  }
+  pressing = false; drag = null;
+  if (e.pointerType !== "mouse") hideLoupe(); else showLoupe(e, p);
+  renderOverlay(); updateAll();
+});
+overlay.addEventListener("pointercancel", () => { pressing = false; drag = null; hideLoupe(); });
+overlay.addEventListener("pointerleave", () => { if (!pressing) hideLoupe(); });
+
+/* ---------- Analysis ---------- */
+function dataPoints() {
+  const ppm = pxPerMeter();
+  const fs = [...marks.keys()].sort((a, b) => a - b);
+  if (!fs.length) return [];
+  const f0 = fs[0], p0 = marks.get(f0), fps = source ? source.captureFps : 1;
+  return fs.map(f => {
+    const m = marks.get(f);
+    return { f, t: (f - f0) / fps, x: ppm ? (m.x - p0.x) / ppm : null, y: ppm ? -(m.y - p0.y) / ppm : null };
+  });
+}
+function quadFit(pts) {
+  // least squares y = A t² + B t + C
+  let S = [0, 0, 0, 0, 0], T = [0, 0, 0];
+  for (const { t, y } of pts) {
+    let tp = 1;
+    for (let i = 0; i < 5; i++) { S[i] += tp; if (i < 3) T[i] += y * tp; tp *= t; }
+  }
+  const M = [[S[4], S[3], S[2], T[2]], [S[3], S[2], S[1], T[1]], [S[2], S[1], S[0], T[0]]];
+  for (let c = 0; c < 3; c++) {
+    let piv = c; for (let r = c + 1; r < 3; r++) if (Math.abs(M[r][c]) > Math.abs(M[piv][c])) piv = r;
+    [M[c], M[piv]] = [M[piv], M[c]];
+    if (Math.abs(M[c][c]) < 1e-14) return null;
+    for (let r = 0; r < 3; r++) if (r !== c) { const f = M[r][c] / M[c][c]; for (let j = c; j < 4; j++) M[r][j] -= f * M[c][j]; }
+  }
+  return { A: M[0][3] / M[0][0], B: M[1][3] / M[1][1], C: M[2][3] / M[2][2] };
+}
+function linFit(pts) {
+  // least squares x = D t + E
+  const n = pts.length; let st = 0, sx = 0, stt = 0, stx = 0;
+  for (const { t, x } of pts) { st += t; sx += x; stt += t * t; stx += t * x; }
+  const den = n * stt - st * st;
+  if (Math.abs(den) < 1e-14) return null;
+  const D = (n * stx - st * sx) / den;
+  return { D, E: (sx - D * st) / n };
+}
+
+/* ---------- UI updates ---------- */
+const fmt = (v, d) => (v < 0 ? "−" : "") + Math.abs(v).toFixed(d);
+const signed = (v, d) => (v < 0 ? "− " : "+ ") + Math.abs(v).toFixed(d);
+function setMode(m) {
+  mode = m;
+  if (m !== "viz") stopPlay();
+  $("toolScale").setAttribute("aria-pressed", m === "scale");
+  $("toolMark").setAttribute("aria-pressed", m === "mark");
+  $("toolViz").setAttribute("aria-pressed", m === "viz");
+  frameCv.classList.toggle("desat", m === "viz");
+  overlay.classList.toggle("viewing", m === "viz");
+  $("play").hidden = m !== "viz"; $("vizKey").hidden = m !== "viz";
+  hideLoupe();
+  renderOverlay(); updateAll();
+}
+function updateAll() {
+  const proj = isProj();
+  const ppm = pxPerMeter();
+  let hint;
+  if (mode === "scale") hint = !scale.a ? "Click one end of the meter stick." : !scale.b ? "Click the other end." : "Drag either end to fine-tune. Then choose Mark ball.";
+  else if (mode === "viz") hint = "Press Play or step through the frames. The orange circle follows the horizontal motion and the blue circle follows the vertical motion.";
+  else if (!ppm) hint = "Set the scale first so positions can be measured in meters.";
+  else if (!marks.size) hint = "Don't mark the ball while it's being held. Step forward until it has been released, then click the top of the ball.";
+  else hint = "Click the top of the ball. The video advances after each click. To remove a mark, go back to its frame and click it. Stop before the ball hits the floor or anything else.";
+  $("hint").textContent = hint;
+
+  if (source) $("frameReadout").textContent = `Frame ${frame} / ${source.frames - 1} · ${fmt(frame / source.captureFps, 4)} s`;
+  else $("frameReadout").textContent = "No video";
+  const nav = !!source && mode !== "scale";
+  $("prev").disabled = !nav || frame <= 0;
+  $("next").disabled = !nav || frame >= source.frames - 1;
+  $("scrub").disabled = !nav;
+  $("stepSelect").disabled = !nav || mode === "viz";
+  $("removeMark").disabled = !marks.has(frame) || mode === "viz";
+
+  $("scaleReadout").textContent = ppm ? `${ppm.toFixed(1)} pixels per meter (line is ${dist(scale.a, scale.b).toFixed(1)} px)` : scale.a ? "Click the second end of the line." : "No scale line yet.";
+
+  // table
+  const pts = dataPoints();
+  $("countText").textContent = pts.length === 1 ? "1 point" : `${pts.length} points`;
+  const tb = $("tbody"); tb.replaceChildren();
+  for (const p of pts) {
+    const tr = document.createElement("tr");
+    if (p.f === frame) tr.className = "current";
+    const d = v => v === null ? "—" : fmt(v, 3);
+    tr.innerHTML = `<td>${p.f}</td><td>${fmt(p.t, 4)}</td>` + (proj ? `<td>${d(p.x)}</td>` : "") + `<td>${d(p.y)}</td>`;
+    tr.addEventListener("click", () => { if (mode !== "scale") go(p.f); });
+    tb.appendChild(tr);
+  }
+  const cur = tb.querySelector(".current"); if (cur) cur.scrollIntoView({ block: "nearest" });
+
+  // fits
+  let fy = null, fx = null;
+  if (ppm && pts.length >= 3) { fy = quadFit(pts); if (proj) fx = linFit(pts); }
+  const fs = [...marks.keys()].sort((a, b) => a - b);
+  fitState = (fy && (!proj || fx)) ? { p0: marks.get(fs[0]), ppm, fx, fy, f0: fs[0], fLast: fs[fs.length - 1], tLast: pts[pts.length - 1].t, ts: pts.map(p => p.t), fps: source.captureFps } : null;
+  $("toolViz").disabled = !(proj && fitState);
+  if (mode === "viz" && !fitState) { setMode("mark"); return; }
+
+  if (fy) {
+    const a = 2 * fy.A;
+    $("gValue").innerHTML = `${Math.abs(a).toFixed(2)}<small>m/s²</small>`;
+    $("fitText").textContent = `y = ${fmt(fy.A, 3)} t² ${signed(fy.B, 3)} t ${signed(fy.C, 4)}   ·   g = |2A|`;
+    let yours = `<b>Your data:</b> `;
+    if (proj && fx) {
+      $("vxValue").innerHTML = `${fmt(fx.D, 2)}<small>m/s</small>`;
+      $("fitTextX").textContent = `x = ${fmt(fx.D, 3)} t ${signed(fx.E, 4)}   ·   vₓ = D`;
+      yours += `Horizontally, D = ${fmt(fx.D, 3)} m/s, so the ball moved sideways at a steady ${Math.abs(fx.D).toFixed(2)} m/s. Vertically, `;
+    }
+    yours += `A = ${fmt(fy.A, 3)} m/s², so a = 2 × (${fmt(fy.A, 3)}) = ${fmt(a, 2)} m/s². ` +
+      (a < 0 ? "The minus sign means the acceleration points down, because up is positive. " : "") +
+      `Its size is g = ${Math.abs(a).toFixed(2)} m/s². ` +
+      (proj ? `At your first mark the ball was moving ${fy.B >= 0 ? "upward" : "downward"} at ${Math.abs(fy.B).toFixed(2)} m/s.`
+            : `Your ball was moving at ${fmt(fy.B, 2)} m/s at your first mark.`);
+    $("explainYours").innerHTML = yours;
+  } else {
+    $("gValue").innerHTML = `—<small>m/s²</small>`;
+    $("vxValue").innerHTML = `—<small>m/s</small>`;
+    $("fitText").textContent = !ppm ? "Set the scale, then mark at least 3 frames." : "Mark at least 3 frames to fit a curve.";
+    $("fitTextX").textContent = "";
+    $("explainYours").textContent = "Once you've set the scale and marked at least 3 frames, your own numbers will appear here.";
+  }
+  const usable = ppm ? pts : [];
+  drawGraph($("graphY"), usable, "y", fy ? t => fy.A * t * t + fy.B * t + fy.C : null, "y (m)", css("--mark"));
+  if (proj) drawGraph($("graphX"), usable, "x", fx ? t => fx.D * t + fx.E : null, "x (m)", css("--hcol"));
+}
+
+/* ---------- Graphs ---------- */
+function niceTicks(lo, hi, n) {
+  const span = hi - lo || 1, raw = span / n, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const stepv = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= raw);
+  const out = []; for (let v = Math.ceil(lo / stepv) * stepv; v <= hi + 1e-9; v += stepv) out.push(+v.toFixed(10));
+  return out;
+}
+function drawGraph(cv, pts, key, fitFn, yLabel, dotCol) {
+  const g = cv.getContext("2d");
+  const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+  if (!W) return;
+  cv.width = W * dpr; cv.height = H * dpr; g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, W, H);
+  const ink = css("--ink"), muted = css("--muted"), line = css("--line"), acc = css("--accent");
+  const pad = { l: 50, r: 12, t: 10, b: 34 };
+  let tMax = 0.5, vMin = -1, vMax = 0.1;
+  if (pts.length) {
+    tMax = Math.max(...pts.map(p => p.t)) || 0.1;
+    vMin = Math.min(0, ...pts.map(p => p[key])); vMax = Math.max(0, ...pts.map(p => p[key]));
+    const pd = (vMax - vMin) * 0.08 || 0.1; vMin -= pd; vMax += pd;
+  }
+  const X = t => pad.l + t / tMax * (W - pad.l - pad.r), Y = v => pad.t + (vMax - v) / (vMax - vMin) * (H - pad.t - pad.b);
+  g.font = "11px 'JetBrains Mono', monospace"; g.lineWidth = 1;
+  g.fillStyle = muted; g.strokeStyle = line;
+  g.textAlign = "right"; g.textBaseline = "middle";
+  for (const v of niceTicks(vMin, vMax, 5)) {
+    g.beginPath(); g.moveTo(pad.l, Y(v)); g.lineTo(W - pad.r, Y(v)); g.stroke();
+    g.fillText(fmt(v, Math.abs(v) < 1 && v !== 0 ? 2 : 1), pad.l - 6, Y(v));
+  }
+  g.textAlign = "center"; g.textBaseline = "top";
+  for (const v of niceTicks(0, tMax, 5)) g.fillText(v.toFixed(2), X(v), H - pad.b + 6);
+  g.fillStyle = ink; g.font = "500 12px Barlow, sans-serif";
+  g.fillText("t (s)", (pad.l + W - pad.r) / 2, H - 14);
+  g.save(); g.translate(12, (pad.t + H - pad.b) / 2); g.rotate(-Math.PI / 2); g.fillText(yLabel, 0, -6); g.restore();
+  g.strokeStyle = muted; g.beginPath(); g.moveTo(pad.l, pad.t); g.lineTo(pad.l, H - pad.b); g.lineTo(W - pad.r, H - pad.b); g.stroke();
+  if (fitFn) {
+    g.strokeStyle = acc; g.lineWidth = 2; g.beginPath();
+    for (let i = 0; i <= 60; i++) { const t = tMax * i / 60, v = fitFn(t); i ? g.lineTo(X(t), Y(v)) : g.moveTo(X(t), Y(v)); }
+    g.stroke();
+  }
+  g.fillStyle = dotCol;
+  for (const p of pts) { g.beginPath(); g.arc(X(p.t), Y(p[key]), 3.2, 0, 7); g.fill(); }
+  if (!pts.length) { g.fillStyle = muted; g.textAlign = "center"; g.textBaseline = "middle"; g.font = "13px Barlow, sans-serif"; g.fillText("Marked points will appear here", (pad.l + W) / 2, (pad.t + H - pad.b) / 2); }
+}
+
+/* ---------- Playback (visualize mode) ---------- */
+function stopPlay() { playing = false; $("play").textContent = "Play"; }
+async function playLoop() {
+  if (!fitState) return;
+  playing = true; $("play").textContent = "Pause";
+  const { f0, fLast } = fitState;
+  if (frame < f0 || frame >= fLast) await showFrame(f0);
+  while (playing && frame < fLast) {
+    const t0 = performance.now();
+    await showFrame(frame + 1);
+    const wait = 70 - (performance.now() - t0);
+    if (wait > 0) await new Promise(r => setTimeout(r, wait));
+  }
+  stopPlay();
+}
+
+/* ---------- Controls ---------- */
+function addOption(v, i) { const o = document.createElement("option"); o.value = i; o.textContent = v.name; $("videoSelect").appendChild(o); }
+VIDEOS.forEach(addOption);
+async function loadVideoList() {
+  if (!VIDEO_LIST_URL) return;
+  const msg = $("listMsg");
+  let list;
+  try {
+    const r = await fetch(VIDEO_LIST_URL, { cache: "no-store" });
+    if (!r.ok) throw new Error("http");
+    const text = await r.text();
+    try { list = JSON.parse(text); } catch (e) {
+      msg.textContent = "videos.json has a typo, often a missing comma or an extra comma after the last video. The built-in demos still work.";
+      msg.hidden = false; return;
+    }
+  } catch (e) {
+    msg.textContent = "Couldn't load the video list. The built-in demos still work.";
+    msg.hidden = false; return;
+  }
+  for (const v of Array.isArray(list) ? list : []) {
+    const file = v.file || v.src;
+    if (!file || !v.fps) continue;
+    const entry = { ...v, name: v.name || file, src: new URL(file, VIDEO_LIST_URL).href };
+    VIDEOS.push(entry); addOption(entry, VIDEOS.length - 1);
+  }
+}
+loadVideoList();
+$("videoSelect").addEventListener("change", e => loadSource(+e.target.value));
+$("toolScale").addEventListener("click", () => setMode("scale"));
+$("toolMark").addEventListener("click", () => setMode("mark"));
+$("toolViz").addEventListener("click", () => { setMode("viz"); if (fitState && (frame < fitState.f0 || frame > fitState.fLast)) go(fitState.f0); });
+$("play").addEventListener("click", () => { playing ? stopPlay() : playLoop(); });
+$("showVel").addEventListener("change", renderOverlay);
+$("showAcc").addEventListener("change", renderOverlay);
+$("prev").addEventListener("click", () => { stopPlay(); go(frame - (mode === "viz" ? 1 : step())); });
+$("next").addEventListener("click", () => { stopPlay(); go(frame + (mode === "viz" ? 1 : step())); });
+$("scrub").addEventListener("input", e => { stopPlay(); go(+e.target.value); });
+$("scaleLen").addEventListener("input", () => { renderOverlay(); updateAll(); });
+$("clearScale").addEventListener("click", () => { scale = { a: null, b: null }; setMode("scale"); });
+$("removeMark").addEventListener("click", () => { marks.delete(frame); renderOverlay(); updateAll(); });
+$("clearMarks").addEventListener("click", () => { marks.clear(); renderOverlay(); updateAll(); });
+$("copyData").addEventListener("click", () => {
+  const pts = dataPoints(), proj = isProj();
+  const text = (proj ? "frame\tt (s)\tx (m)\ty (m)\n" : "frame\tt (s)\ty (m)\n") +
+    pts.map(p => `${p.f}\t${p.t.toFixed(4)}` + (proj ? `\t${p.x === null ? "" : p.x.toFixed(4)}` : "") + `\t${p.y === null ? "" : p.y.toFixed(4)}`).join("\n");
+  const fb = () => { const ta = $("copyFallback"); ta.value = text; ta.hidden = false; ta.focus(); ta.select(); };
+  try {
+    navigator.clipboard.writeText(text).then(() => { $("copyData").textContent = "Copied"; setTimeout(() => $("copyData").textContent = "Copy data", 1500); }, fb);
+  } catch (e) { fb(); }
+});
+document.addEventListener("keydown", e => {
+  if (e.target.matches("input, select, textarea") || mode === "scale") return;
+  const s = mode === "viz" ? 1 : step();
+  if (e.key === "ArrowRight") { e.preventDefault(); stopPlay(); go(frame + s); }
+  if (e.key === "ArrowLeft") { e.preventDefault(); stopPlay(); go(frame - s); }
+});
+new ResizeObserver(() => { renderOverlay(); updateAll(); }).observe($("wrap"));
+new ResizeObserver(() => updateAll()).observe($("graphY"));
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { renderOverlay(); updateAll(); });
+new MutationObserver(() => { renderOverlay(); updateAll(); }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+loadSource(0);
+</script>
+
+</body></html>

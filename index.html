@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ScienceWorks</title>
+<meta name="description" content="Free interactive science simulations for physics and chemistry classrooms.">
+<style>
+  :root {
+    --bg: #03201a;
+    --glass: rgba(190, 255, 235, 0.07);
+    --glass-hi: rgba(225, 255, 246, 0.17);
+    --line: rgba(150, 240, 210, 0.25);
+    --ink: #ecfbf6;
+    --muted: #a9d6c8;
+    --aqua: #5fe8d5;
+    --sodium: #ffd45e;
+    --font: Verdana, "Trebuchet MS", Tahoma, system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--bg); }
+  body {
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--font);
+    font-size: 19px;
+    line-height: 1.65;
+    background-color: var(--bg);
+    background-image:
+      radial-gradient(900px 500px at 85% -5%, rgba(95, 232, 213, 0.18), transparent 60%),
+      radial-gradient(700px 520px at -10% 35%, rgba(40, 180, 120, 0.15), transparent 60%);
+    background-attachment: fixed;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .wrap { width: 100%; max-width: 1040px; margin: 0 auto; padding: 56px 20px 40px; flex: 1; }
+  h1 {
+    font-size: clamp(42px, 8vw, 76px);
+    line-height: 1.05;
+    margin: 0 0 14px;
+    letter-spacing: -0.01em;
+    background: linear-gradient(180deg, var(--ink) 30%, var(--aqua) 130%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .lede { max-width: 60ch; color: var(--ink); margin: 0 0 44px; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+    gap: 18px;
+  }
+  a.card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 22px 24px;
+    border-radius: 20px;
+    text-decoration: none;
+    color: var(--ink);
+    background: linear-gradient(180deg, var(--glass-hi), var(--glass) 45%);
+    border: 1px solid var(--line);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 14px 32px rgba(0, 0, 0, 0.35);
+    transition: transform 0.12s, border-color 0.12s;
+  }
+  a.card:hover { transform: translateY(-2px); border-color: var(--aqua); }
+  a.card:focus-visible { outline: 3px solid var(--aqua); outline-offset: 3px; }
+  .card h2 { margin: 0; font-size: 22px; line-height: 1.25; color: var(--sodium); }
+  .card p { margin: 0; font-size: 17px; color: var(--muted); line-height: 1.55; }
+  footer {
+    border-top: 1px solid var(--line);
+    padding: 22px 20px 30px;
+    text-align: center;
+    font-size: 15px;
+    color: var(--muted);
+  }
+  footer a { color: var(--aqua); }
+  @media (prefers-reduced-motion: reduce) { a.card { transition: none; } }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <h1>ScienceWorks</h1>
+  <p class="lede">Interactive simulations for physics and chemistry. Everything here is free to use and adapt for teaching and learning.</p>
+
+  <!-- To add a sim: copy one of the <a class="card"> blocks below, change the link, title and blurb. -->
+  <div class="grid">
+    <a class="card" href="/galileos-ramps/">
+      <h2>Galileo's Ramps</h2>
+      <p>Release a ball on one ramp and see where it stops on another. Change the gap, the height, and the friction.</p>
+    </a>
+    <a class="card" href="/free-fall-tracker/">
+      <h2>Free-Fall Tracker</h2>
+      <p>Mark a falling ball frame by frame in real video and measure g from your own data.</p>
+    </a>
+    <a class="card" href="/chasing-the-ether/">
+      <h2>Chasing the Ether</h2>
+      <p>From Young's two slits to Michelson and Morley: how light was shown to be a wave, and what the ether experiment found.</p>
+    </a>
+  </div>
+</main>
+<footer>
+  Licensed <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a>: free to use and modify for non-commercial, educational purposes, with attribution and the same license.
+</footer>
+</body>
+</html>
