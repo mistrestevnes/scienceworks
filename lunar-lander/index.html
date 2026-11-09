@@ -87,13 +87,13 @@ button.primary { border-width: 2.5px; }
 .fuelbox .bar i { display: block; height: 100%; background: var(--line); }
 .fuelbox #rF { min-width: 4ch; text-align: right; font-variant-numeric: tabular-nums; }
 .altbig {
-  position: absolute; right: 18px; bottom: 14px; text-align: right; pointer-events: none;
+  position: absolute; right: 56px; bottom: 46px; text-align: right; pointer-events: none;
   font-variant-numeric: tabular-nums; line-height: 1.05;
 }
 .altbig .lbl { font-size: 18px; }
 .altbig .num { font-size: 64px; white-space: nowrap; }
 .minimap {
-  position: absolute; left: 14px; bottom: 14px; width: 420px; height: 90px;
+  position: absolute; left: 14px; bottom: 14px; width: 490px; height: 90px;
   border: 1.5px solid var(--line); background: var(--bg);
 }
 .fbd {
@@ -133,7 +133,7 @@ button.primary { border-width: 2.5px; }
 
     <div class="toast" id="toast" hidden></div>
     <div class="fuelbox" aria-label="Fuel"><span>Fuel</span><div class="bar"><i id="fuelFill" style="width:100%"></i></div><span id="rF">100%</span></div>
-    <canvas class="minimap" id="minimap" width="840" height="180" hidden aria-label="Terrain ahead (minimap)"></canvas>
+    <canvas class="minimap" id="minimap" width="980" height="180" hidden aria-label="Terrain ahead (minimap)"></canvas>
     <div class="altbig" id="altBig" hidden aria-label="Altitude"><div class="lbl">Altitude</div><div class="num" id="rH">0.0 m</div></div>
     <div class="powerbar" aria-label="Engine"><span>Engine</span><span id="rPow">OFF</span><div class="bar"><i id="pwFill" style="width:50%"></i></div><span id="rThr">50%</span></div>
     <div class="nav" aria-label="Next team">
@@ -152,6 +152,7 @@ button.primary { border-width: 2.5px; }
         <b>↑  ↓</b><span>throttle up, down (10% steps)</span>
         <b>Space</b><span>start, pause</span>
         <b>R</b><span>restart</span>
+        <b>V</b><span>velocity components on, off</span>
       </div>
       <div class="results" id="ovResults" hidden></div>
       <div class="graphs" id="ovGraphs" hidden>
@@ -163,7 +164,8 @@ button.primary { border-width: 2.5px; }
         <div class="btnrow"><span class="lbl">Practice landing:</span>
           <button data-practice="0">Plateau</button><button data-practice="1">Ravine</button><button data-practice="2">Mountain</button><button data-practice="3">Ledge</button><button data-practice="4">Crater</button>
         </div>
-        <div class="btnrow"><span class="lbl">Educational mode:</span><button id="bEdu" aria-pressed="false">Off</button></div>
+        <div class="btnrow"><span class="lbl">Educational mode:</span><button id="bEdu" aria-pressed="false">Off</button>
+          <span class="lbl" style="margin-left:14px">Velocity components (V):</span><button id="bComp" aria-pressed="false">Off</button></div>
         <div class="btnrow" id="eduOpts" hidden>
           <span class="lbl">World:</span><button data-world="Moon" aria-pressed="true">Moon</button><button data-world="Mars" aria-pressed="false">Mars</button><button data-world="Ceres" aria-pressed="false">Ceres</button>
           <span class="lbl" style="margin-left:10px">Mass:</span><button id="bMass" aria-pressed="false">Constant</button>
@@ -188,14 +190,16 @@ button.primary { border-width: 2.5px; }
   const MAX_THRUST = 94000;       // N, the one engine at 100% throttle
   const START_THROTTLE = 0.5;
   const FULL_BURN_S = 360;        // seconds a full tank lasts at 100% throttle on the Moon
-  const ROT_RATE = 90;            // degrees per second while an arrow key is held
+  const ROT_RATE = 63;            // degrees per second while an arrow key is held (30% slower than the old 90)
   const MAX_TILT = 10;            // degrees from upright allowed at touchdown
   const SAFE_VY = 2.5, SAFE_VX = 2.0;
   const ZOOM_IN_ALT = 40, ZOOM_OUT_ALT = 50;   // below 40 m above the surface: close view (landing view when descending); out above 50 m
   const CLOSE_H = 120;            // metres shown top to bottom in the close view
   const FAR_H = 600;              // metres shown top to bottom in the far view
   const LAND_ALT = 40, LAND_OUT_ALT = 50, LAND_H = 115;   // closest (landing) view: one cut to a 115 m tall view when descending below 40 m
-  const SHELTER_ZOOM = 150;       // close view also starts within 150 m (straight line) of the next shelter
+  // shelter zoom: the close view starts when the ship is less than 200 m above the next shelter's ground
+  // and within 400 m of it sideways; it ends above 220 m or beyond 420 m
+  const SH_ALT = 200, SH_X = 400;
   const LEG = 4.25;               // half the distance between Grace's front footpads, m
   // arrow lengths grow as the view zooms in: these are the lengths in the far view (px per m/s, px per m/s/s);
   // the close view (5x closer) draws them 5x longer, the landing view 10x
@@ -408,7 +412,7 @@ button.primary { border-width: 2.5px; }
   const $ = id => document.getElementById(id);
   let pxW = 0, pxH = 0, dpr = 1;
   const keys = new Set();
-  const settings = { edu: false, world: 'Moon', varMass: false };
+  const settings = { edu: false, world: 'Moon', varMass: false, vcomp: false };
   let game, s, view = { x: 0, y: 0, scale: 1, zoomed: false, level: 3 }, toastTimer = null;
   let grav = WORLDS.Moon;
 
@@ -619,18 +623,23 @@ button.primary { border-width: 2.5px; }
   const shipScale = () => view.scale * SHIP_DRAW;
   const EDGE = 45, NAV = 340;   // px kept clear: screen edges; on the right the next-team display + the ship's labels
   const shelterDist = () => { const tg = target(); return tg.site ? Math.hypot(tg.x - s.x, tg.y - s.y) : Infinity; };
+  const nearShelter = (pad = 0) => { const tg = target(); return !!tg.site && Math.abs(tg.x - s.x) <= SH_X + pad && s.y - 3.5 - tg.y <= SH_ALT + pad; };
   function placeClose() {
     const tg = target(), st = tg.site;
-    const nearSite = st && shelterDist() <= SHELTER_ZOOM + 60;
-    const g = nearSite ? Math.min(st.y, groundAt(s.x)) : groundAt(s.x);
-    // height that fits the ship (and its a arrow) above the ground with the ground at the top of the bottom third
-    // with the ship centred vertically, the ground and shelter must fit in the lower half (plus a margin)
-    const need = CENTER_Y ? (s.y - g) * 2 / (1 - 120 / pxH) : (s.y + 3.5 - g) / (2 / 3 - 90 / pxH);
+    const nearSite = nearShelter(60);
+    // shelter zoom: the shelter's ground goes 3/4 of the way down; closest view: the lower of it and the ground under the ship
+    const g = nearSite ? (view.landing ? Math.min(st.y, groundAt(s.x)) : st.y) : groundAt(s.x);
+    const shipTop = s.y - 3.5 + 11.9 * SHIP_DRAW;   // top of the cabin as drawn
+    let need, gAt;   // view height, and where the ground goes (fraction of the height up from the bottom)
+    if (view.landing) { need = LAND_H; gAt = 1 / 3; }                                         // closest view: ground at the bottom third
+    else if (nearSite) { need = (shipTop - g) / (0.75 - 90 / pxH); gAt = 0.25; }             // shelter zoom: ground 3/4 of the way down
+    else { need = CENTER_Y ? (s.y - g) * 2 / (1 - 120 / pxH) : (s.y + 3.5 - g) / (2 / 3 - 90 / pxH); gAt = 1 / 3; }
     view.closeH = view.landing ? LAND_H : Math.min(FAR_H, Math.max(CLOSE_H, need));
+    view.fixedY = view.landing || nearSite;   // these two views hold still up and down (the ground stays put)
     setScale();
     const k = view.scale, hM = pxH / k, wM = pxW / k;
     view.gRef = g;            // the background mountains stand on this ground level in the close views
-    view.y = g - hM / 3;      // ground at the top of the bottom third
+    view.y = g - hM * gAt;
     view.y = Math.max(view.y, s.y + SHIP_TOP + 70 / k - hM);
     view.y = Math.min(view.y, s.y - 3.5 - 30 / k);
     // sideways: the ship always lands in the middle third of the screen. Moving right it is placed a third
@@ -665,13 +674,12 @@ button.primary { border-width: 2.5px; }
   const CENTER_Y = true;
   function updateView() {
     updateViewXY();
-    // the closest (landing) view is the exception: it stays where it was placed, ground at the bottom third
-    if (CENTER_Y && game.state !== 'over' && !(view.close && view.landing)) view.y = s.y - (pxH / view.scale) / 2;
+    // the closest view and the shelter zoom are the exceptions: they stay where they were placed
+    if (CENTER_Y && game.state !== 'over' && !(view.close && view.fixedY)) view.y = s.y - (pxH / view.scale) / 2;
   }
   function updateViewXY() {
     if (game.state === 'flying' || game.state === 'ready') {
-      const d = shelterDist();
-      const want = view.close ? (s.alt <= ZOOM_OUT_ALT || d <= SHELTER_ZOOM + 20) : (s.alt < ZOOM_IN_ALT || d <= SHELTER_ZOOM);
+      const want = view.close ? (s.alt <= ZOOM_OUT_ALT || nearShelter(20)) : (s.alt < ZOOM_IN_ALT || nearShelter());
       if (want !== view.close) { view.close = want; view.landing = false; view.resetY = true; view.place = true; }
       // landing view: entered while descending below 20 m, left above 25 m (each change is one instant cut)
       if (view.close && game.state === 'flying') {
@@ -799,68 +807,138 @@ button.primary { border-width: 2.5px; }
     ctx.stroke(); ctx.restore();
     return [x1, y1];
   }
-  // Closest view, landing near a shelter: v and its x and y components, drawn large, 1.5 ship diameters
-  // (the 9.2 m cabin, as drawn) to the side of the ship.
-  const VC_SCALE = 40;   // px per m/s
-  function drawVComponents(sx, sy, k, tg) {
-    const off = 1.5 * 9.2 * k, F = 24;
-    const fx = s.vx * VC_SCALE, fy = -s.vy * VC_SCALE;     // screen offsets of the tip (y down)
-    ctx.font = `200 ${F}px "JetBrains Mono", ui-monospace, monospace`;
-    const lw = ctx.measureText('v = −0.0 m/s').width + 90;
-    const y0 = Math.min(sy, pxH - 50 - Math.max(0, fy));   // keep the tip of a long downward arrow on screen
-    // stays clear of the screen edges, and of the next-team display when level with it
-    const navBand = Math.min(y0, y0 + fy) - F * 2 < pxH / 2 + 40 && Math.max(y0, y0 + fy) + F * 2 > pxH / 2 - 40;
-    const fits = d => { const x = sx + d * off, lo = Math.min(x, x + fx) - (d < 0 ? lw : 40), hi = Math.max(x, x + fx) + (d > 0 ? lw : 40); return lo > EDGE && hi < pxW - (navBand ? 220 : EDGE); };
-    // the side is chosen once per approach (so it does not jump about): the side the ship is moving toward,
-    // so the x arrow points away from the ship, or if hardly moving sideways, the side away from the shelter.
-    // It switches only if it no longer fits on screen.
-    let dir = view.vcDir || (Math.abs(s.vx) > 0.2 ? Math.sign(s.vx) : (tg.x < s.x ? 1 : -1));
-    if (!fits(dir) && fits(-dir)) dir = -dir;
-    view.vcDir = dir;
-    const x0 = sx + dir * off;
-    const head = (x1, y1, len, hd) => {
-      const ang = Math.atan2(y1 - y0, x1 - x0);
-      ctx.moveTo(x1 - hd * Math.cos(ang - .45), y1 - hd * Math.sin(ang - .45)); ctx.lineTo(x1, y1); ctx.lineTo(x1 - hd * Math.cos(ang + .45), y1 - hd * Math.sin(ang + .45));
+  // ---------- v and a arrows ----------
+  // Drawn behind the ship; their labels are drawn over it.
+  // Far and close views: each arrow comes out of the hull in the direction it points (the hull taken as an
+  // ellipse from footpad to footpad, 10.1 m, and from the pads to the top of the cabin, 11.9 m, as drawn).
+  // Closest view: v starts to the right of the ship with its values to the right of it, and a to the left, both large; v's x and y components show when coming in to land near a shelter (not while
+  // launching), or always when "Velocity components" is on. Components are thin and dotted in every view.
+  const VC_SCALE = 40;   // closest view: px per m/s for v and its components
+  const THIN = n => `200 ${n}px "JetBrains Mono", ui-monospace, monospace`;
+  const sgn = n => (n < 0 && Math.abs(n) >= 0.05 ? '−' : '') + Math.abs(n).toFixed(1);
+  function drawArrow(x0, y0, x1, y1, st) {
+    const len = Math.hypot(x1 - x0, y1 - y0);
+    if (len < 4) return;
+    const hd = Math.min(st.head || 11, len * 0.4), ang = Math.atan2(y1 - y0, x1 - x0);
+    ctx.save(); ctx.globalAlpha = st.alpha ?? 1; ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = st.w; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.setLineDash(st.dash || []); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(x1 - hd * Math.cos(ang - .45), y1 - hd * Math.sin(ang - .45)); ctx.lineTo(x1, y1); ctx.lineTo(x1 - hd * Math.cos(ang + .45), y1 - hd * Math.sin(ang + .45));
+    ctx.stroke(); ctx.restore();
+  }
+  const COMP = { w: 1.3, alpha: 0.95, dash: [2, 5], head: 9 };   // velocity components: thin and dotted
+  // a label: main letter, optional subscript, rest; measured so labels can be kept apart
+  function mkLabel(main, sub, rest, size, x, y, align) {
+    ctx.font = THIN(size); const w1 = ctx.measureText(main).width, w3 = ctx.measureText(rest).width;
+    ctx.font = THIN(Math.round(size * 0.68)); const w2 = sub ? ctx.measureText(sub).width + 1 : 0;
+    const w = w1 + w2 + w3, h = size + 2, left = align === 'right' ? x - w : align === 'center' ? x - w / 2 : x;
+    return { main, sub, rest, size, x: left, y: y - h / 2, w, h, w1, w2 };
+  }
+  function drawLabels(list) {
+    ctx.save(); ctx.fillStyle = '#FFFFFF'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    for (const L of list) {
+      const y = L.y + L.h / 2;
+      ctx.font = THIN(L.size); ctx.fillText(L.main, L.x, y);
+      if (L.sub) { ctx.font = THIN(Math.round(L.size * 0.68)); ctx.fillText(L.sub, L.x + L.w1, y + L.size * 0.28); }
+      ctx.font = THIN(L.size); ctx.fillText(L.rest, L.x + L.w1 + L.w2, y);
+    }
+    ctx.restore();
+  }
+  // move labels apart: each later label steps up or down (away from the ship) until it overlaps no earlier one
+  function separate(list, cy) {
+    const hit = (p, q) => p.x < q.x + q.w + 6 && q.x < p.x + p.w + 6 && p.y < q.y + q.h + 3 && q.y < p.y + p.h + 3;
+    for (let i = 1; i < list.length; i++) {
+      const L = list[i], dir = L.y + L.h / 2 >= cy ? 1 : -1;
+      for (let n = 0; n < 8 && list.slice(0, i).some(q => hit(L, q)); n++) L.y += dir * (L.h + 4);
+    }
+    return list;
+  }
+  // where a ray from the craft's centre, along screen direction (ux, uy), leaves the hull
+  function hullEdge(cx, cy, ux, uy, k) {
+    const r = s.rot * Math.PI / 180, X = ux, Y = -uy;
+    const lx = X * Math.cos(r) - Y * Math.sin(r), ly = X * Math.sin(r) + Y * Math.cos(r);
+    const t = 1 / Math.hypot(lx / 5.05, ly / 5.95);
+    return [cx + ux * t * k, cy + uy * t * k];
+  }
+  function drawVectors() {
+    if (game.state !== 'flying' && game.state !== 'ready') return [];
+    const k = shipScale(), [ox, oy] = shipScreen(), r = s.rot * Math.PI / 180;
+    const cx = ox + 2.45 * Math.sin(r) * k, cy = oy - 2.45 * Math.cos(r) * k;   // centre of the craft
+    const v = Math.hypot(s.vx, s.vy), a = Math.hypot(s.ax, s.ay);
+    const vText = ' = ' + (s.vy < 0 && v >= 0.05 ? '−' : '') + v.toFixed(1) + ' m/s';
+    const aText = ' = ' + (s.ay < 0 && a >= 0.05 ? '−' : '') + a.toFixed(1) + ' m/s/s';
+    const labels = [];
+
+    if (view.close && view.landing) {
+      // ----- closest view: fixed near the middle of the screen
+      // v starts 1.5 cabin diameters (as drawn) to the right of the craft's centre, a the same distance to the left
+      const F = 24, off = 1.5 * 9.2 * k, VX = cx + off, AX = cx - off;
+      const near = game.state === 'flying' && !game.launching && nearShelter();
+      const comps = settings.vcomp || near;
+      const fx = s.vx * VC_SCALE, fy = -s.vy * VC_SCALE;
+      const Y0 = Math.min(cy, pxH - 50 - Math.max(0, fy)), AY = cy;   // keep a long downward v arrow on screen
+      if (comps) {
+        ctx.save(); ctx.globalAlpha = 0.4; ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1; ctx.setLineDash([5, 6]);
+        ctx.beginPath(); ctx.moveTo(VX + fx, Y0 + fy); ctx.lineTo(VX + fx, Y0); ctx.moveTo(VX + fx, Y0 + fy); ctx.lineTo(VX, Y0 + fy); ctx.stroke(); ctx.restore();
+        drawArrow(VX, Y0, VX + fx, Y0, { ...COMP, w: 1.6, head: 13 });
+        drawArrow(VX, Y0, VX, Y0 + fy, { ...COMP, w: 1.6, head: 13 });
+      }
+      drawArrow(VX, Y0, VX + fx, Y0 + fy, { w: 3, head: 16 });
+      const A = A_REF * arrowZoom(), ax = s.ax * A, ay = -s.ay * A;
+      drawArrow(AX, AY, AX + ax, AY + ay, { w: 1.6, alpha: 0.8, dash: [1, 6], head: 14 });
+      ctx.save(); ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath(); ctx.arc(VX, Y0, 3, 0, Math.PI * 2); ctx.moveTo(AX + 3, AY); ctx.arc(AX, AY, 3, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      const down = fy >= 0, right = fx >= 0;
+      // short names on the arrows
+      if (comps && Math.abs(fx) >= 20) labels.push(mkLabel('v', 'x', '', F, VX + fx / 2, Y0 + (down ? -F * 0.8 : F * 0.8), 'center'));
+      if (comps && Math.abs(fy) >= 20) labels.push(mkLabel('v', 'y', '', F, VX + (right ? -10 : 10), Y0 + fy / 2, right ? 'right' : 'left'));
+      if (comps && Math.hypot(fx, fy) >= 4) labels.push(mkLabel('v', '', '', F, VX + fx + (right ? 10 : -10), Y0 + fy + (down ? F * 0.6 : -F * 0.6), right ? 'left' : 'right'));
+      // the values, in a column to the right of the v arrows
+      const yName = comps && Math.abs(fy) >= 20 && !right ? F * 1.4 : 0;
+      const bx = Math.max(VX, VX + fx) + 30 + yName;
+      const rows = comps ? [['', vText], ['x', ' = ' + sgn(s.vx) + ' m/s'], ['y', ' = ' + sgn(s.vy) + ' m/s']] : [['', vText]];
+      const by = Math.max(F * 1.6, Math.min(pxH - F * 4.5, Y0 + fy / 2 - F * 1.3 * (rows.length - 1) / 2));
+      rows.forEach(([sub, t], n) => labels.push(mkLabel('v', sub, t, F, bx, by + n * F * 1.3, 'left')));
+      // a: label beyond its tip, on the side away from the ship unless a points clearly right; kept on screen
+      const aL = Math.hypot(ax, ay), aR = aL >= 4 && ax > 2;
+      const lx = aL < 4 ? AX - 14 : AX + ax + (aR ? 12 : -12), ly = aL < 4 ? AY : AY + ay + (Math.abs(ax) < aL * 0.4 ? (ay > 0 ? F * 0.8 : -F * 0.8) : 0);
+      labels.push(mkLabel('a', '', aText, F, lx, Math.max(70 + F, Math.min(pxH - F, ly)), aR ? 'left' : 'right'));
+      return labels;
+    }
+
+    // ----- far and close views: out of the hull
+    const VS = V_REF * arrowZoom(), AS = A_REF * arrowZoom(), F = 14;
+    let vBase = [cx, cy], vTip = null;
+    if (v * VS >= 4) {
+      const ux = s.vx / v, uy = -s.vy / v;
+      vBase = hullEdge(cx, cy, ux, uy, k); vTip = [vBase[0] + ux * v * VS, vBase[1] + uy * v * VS];
+      if (settings.vcomp) {
+        drawArrow(vBase[0], vBase[1], vBase[0] + s.vx * VS, vBase[1], COMP);
+        drawArrow(vBase[0], vBase[1], vBase[0], vBase[1] - s.vy * VS, COMP);
+      }
+      drawArrow(vBase[0], vBase[1], vTip[0], vTip[1], { w: 1.5 });
+    }
+    let aTip = null;
+    if (a * AS >= 4) {
+      const ux = s.ax / a, uy = -s.ay / a, b = hullEdge(cx, cy, ux, uy, k);
+      aTip = [b[0] + ux * a * AS, b[1] + uy * a * AS];
+      drawArrow(b[0], b[1], aTip[0], aTip[1], { w: 1.2, alpha: 0.75, dash: [1, 5] });
+    }
+    // labels just beyond each tip, off the craft
+    const shipR = 6.5 * k + 10;
+    const beyond = (tip, main, sub, rest) => {
+      // no arrow: label beside the ship, on the side away from the v arrow
+      const dx = tip ? tip[0] - cx : (vTip && vTip[0] - cx > 4 ? -1 : 1), dy = tip ? tip[1] - cy : 0, L = Math.hypot(dx, dy);
+      const ux = L > 1 || !tip ? dx / L : 1, uy = L > 1 || !tip ? dy / L : 0, R = Math.max(tip ? L : 0, shipR) + 10;
+      const x = cx + ux * R, y = cy + uy * R + (Math.abs(ux) < 0.4 ? (uy >= 0 ? F / 2 : -F / 2) : 0);
+      return mkLabel(main, sub, rest, F, x, y, ux >= 0 ? 'left' : 'right');
     };
-    const line = (x1, y1, w, alpha) => {
-      const len = Math.hypot(x1 - x0, y1 - y0);
-      ctx.save(); ctx.globalAlpha = alpha; ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-      ctx.beginPath();
-      if (len < 4) { ctx.restore(); return; }
-      ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); head(x1, y1, len, Math.min(16, len * 0.4)); ctx.stroke(); ctx.restore();
-    };
-    // dashed lines from the tip of v to the tips of its components
-    ctx.save(); ctx.globalAlpha = 0.5; ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.2; ctx.setLineDash([5, 6]);
-    ctx.beginPath(); ctx.moveTo(x0 + fx, y0 + fy); ctx.lineTo(x0 + fx, y0); ctx.moveTo(x0 + fx, y0 + fy); ctx.lineTo(x0, y0 + fy); ctx.stroke(); ctx.restore();
-    line(x0 + fx, y0, 2.2, 0.85);          // x component
-    line(x0, y0 + fy, 2.2, 0.85);          // y component
-    line(x0 + fx, y0 + fy, 3, 1);          // v
-    ctx.fillStyle = '#FFFFFF'; ctx.beginPath(); ctx.arc(x0, y0, 3, 0, Math.PI * 2); ctx.fill();
-    // labels with a real subscript: v, vₓ, vᵧ
-    const sgn = n => (n < 0 && Math.abs(n) >= 0.05 ? '−' : '') + Math.abs(n).toFixed(1);
-    const label = (x, y, sub, text, align) => {
-      const big = `200 ${F}px "JetBrains Mono", ui-monospace, monospace`, small = `200 ${Math.round(F * 0.68)}px "JetBrains Mono", ui-monospace, monospace`;
-      ctx.font = big; const w1 = ctx.measureText('v').width, w3 = ctx.measureText(text).width;
-      ctx.font = small; const w2 = sub ? ctx.measureText(sub).width + 1 : 0;
-      const W = w1 + w2 + w3, left = align === 'right' ? x - W : align === 'center' ? x - W / 2 : x;
-      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-      ctx.font = big; ctx.fillText('v', left, y);
-      if (sub) { ctx.font = small; ctx.fillText(sub, left + w1, y + F * 0.28); }
-      ctx.font = big; ctx.fillText(text, left + w1 + w2, y);
-      ctx.textBaseline = 'alphabetic';
-    };
-    const down = fy >= 0, right = fx >= 0;
-    // short names on the arrows, each on the outside of its arrow
-    if (Math.abs(fx) >= 20) label(x0 + fx / 2, y0 + (down ? -F * 0.8 : F * 0.8), 'x', '', 'center');
-    if (Math.abs(fy) >= 20) label(x0 + (right ? -10 : 10), y0 + fy / 2, 'y', '', right ? 'right' : 'left');
-    if (Math.hypot(fx, fy) >= 4) label(x0 + fx + (right ? 10 : -10), y0 + fy + (down ? F * 0.6 : -F * 0.6), '', '', right ? 'left' : 'right');
-    // the values, in a column beside the arrows on the side away from the ship
-    const v = Math.hypot(s.vx, s.vy);
-    const rows = [['', ' = ' + (s.vy < 0 && v >= 0.05 ? '−' : '') + v.toFixed(1) + ' m/s'], ['x', ' = ' + sgn(s.vx) + ' m/s'], ['y', ' = ' + sgn(s.vy) + ' m/s']];
-    const yName = Math.abs(fy) >= 20 && (right ? -1 : 1) === dir ? F * 1.4 : 0;   // room for the vᵧ name when it is on this side
-    const bx = dir > 0 ? Math.max(x0, x0 + fx) + 34 + yName : Math.min(x0, x0 + fx) - 34 - yName;
-    const by = Math.max(F * 1.6, Math.min(pxH - F * 4.5, y0 + fy / 2 - F * 1.3));
-    rows.forEach(([sub, t], n) => label(bx, by + n * F * 1.3, sub, t, dir > 0 ? 'left' : 'right'));
+    labels.push(beyond(vTip, 'v', '', vText), beyond(aTip, 'a', '', aText));
+    if (settings.vcomp && vTip) {
+      const hx = s.vx * VS, hy = -s.vy * VS;
+      if (Math.abs(hx) >= 4) labels.push(mkLabel('v', 'x', ' = ' + sgn(s.vx) + ' m/s', F, vBase[0] + hx + (hx > 0 ? 8 : -8), vBase[1], hx > 0 ? 'left' : 'right'));
+      if (Math.abs(hy) >= 4) labels.push(mkLabel('v', 'y', ' = ' + sgn(s.vy) + ' m/s', F, vBase[0], vBase[1] + hy + (hy > 0 ? F : -F), 'center'));
+    }
+    return separate(labels, cy);
   }
 
   function drawTargetPointer() {
@@ -872,6 +950,7 @@ button.primary { border-width: 2.5px; }
     // keep clear of the next-team display in the bottom-right corner
     let px = cx + dx * f, py = cy + dy * f;
     if (px > pxW - 260 && Math.abs(py - pxH / 2) < 50) py = pxH / 2 + (py < pxH / 2 ? -50 : 50);
+    if (px < 520 && py > pxH - 125) py = pxH - 125;   // and of the minimap (bottom left)
     ctx.save(); ctx.translate(px, py); ctx.rotate(Math.atan2(dy, dx));
     stroke(() => { ctx.moveTo(-14, -9); ctx.lineTo(0, 0); ctx.lineTo(-14, 9); ctx.closePath(); }, 2);
     ctx.restore();
@@ -910,12 +989,17 @@ button.primary { border-width: 2.5px; }
     // magnify them). Both layers stand on one ground level: in the far view the general ground level around
     // the camera (changes slowly), in the close views the ground the view was placed on (so in the closest
     // view they stand on the bottom third). Every mountain in a layer shares it, so none grows or sinks on
-    // its own. Sideways they slide at 25% / 50% of the ship's ground speed (in far-view pixels).
+    // its own. Sideways they shift opposite to the camera's movement, by 25% / 50% of it (in far-view pixels):
+    // when the camera holds still (close views), nothing in the background moves, as with a real viewpoint.
     const kf = pxH / FAR_H, camC = view.x + pxW / view.scale / 2;
-    const horizon = SY(view.close && view.gRef !== undefined ? view.gRef : smoothAt(camC));
+    const ref = view.close && view.gRef !== undefined ? view.gRef : smoothAt(camC);
+    const camY = view.y + pxH / view.scale / 2;   // height of the middle of the view
+    // vertical parallax: when the viewpoint is higher than the ground level they stand on, the ground drops on
+    // screen by the full height difference but each layer only by 25% / 50% of it, so climbing shows more of them
     for (const D of BG_DEPTHS) {
+      const horizon = SY(ref) - (1 - D.p) * (camY - ref) * kf;
       for (const M of D.m) {
-        const sx = (M.x - D.p * camC) * kf + pxW / 2;
+        const sx = (M.x - D.p * camC) * kf + pxW / 2;   // parallax: shifts only when the camera moves, far layer less
         if (sx + M.x1 * kf < -20 || sx + M.x0 * kf > pxW + 20) continue;
         const pts = M.shape.map(([dx, h]) => [sx + dx * kf, horizon - h * kf]);
         ctx.beginPath(); curve(pts); ctx.lineTo(pts[pts.length - 1][0], pxH + 10); ctx.lineTo(pts[0][0], pxH + 10); ctx.closePath();
@@ -961,55 +1045,9 @@ button.primary { border-width: 2.5px; }
     }
     drawBase();
     if (settings.edu && (game.state === 'flying' || game.state === 'ready')) drawCoastPath();
+    const vecLabels = drawVectors();   // the arrows go behind the ship
     drawShip();
-
-    if (game.state !== 'flying') view.vcDir = 0;   // the v display picks its side afresh on each approach
-    if (game.state === 'flying' || game.state === 'ready') {
-      const k = shipScale(), [ox, oy] = shipScreen();
-      // velocity arrow centred under the ship: its midpoint sits directly below the ship,
-      // low enough that neither end reaches the ship
-      // v and a both start at the centre of the ship; labels go just beyond each arrow's tip and are
-      // pushed apart if they would overlap each other or the ship
-      const V_SCALE = V_REF * arrowZoom(), A_SCALE = A_REF * arrowZoom();
-      const v = Math.hypot(s.vx, s.vy), vs = s.vy < 0 && v >= 0.05 ? '−' : '';
-      const a = Math.hypot(s.ax, s.ay), as = s.ay < 0 && a >= 0.05 ? '−' : '';
-      const cy = oy - 2.45 * k;   // centre of the craft (halfway between footpads and the top of the sphere)
-      // closest view, coming in to land near a shelter (not while launching): the v arrow moves to the side
-      // of the ship and is shown large with its x and y components
-      const tg = target();
-      const comps = view.close && view.landing && game.state === 'flying' && !game.launching && tg.site && shelterDist() <= SHELTER_ZOOM + 60;
-      const tv = comps ? null : arrowLine(ox, cy, s.vx, s.vy, V_SCALE);
-      const ta = arrowLine(ox, cy, s.ax, s.ay, A_SCALE, true);   // a: dotted, less prominent than v
-      ctx.font = '200 14px "JetBrains Mono", ui-monospace, monospace';   // thin weight for the arrow labels
-      const box = (tip, text) => {
-        const w = ctx.measureText(text).width, h = 16, dx = tip[0] - ox, dy = tip[1] - cy, L = Math.hypot(dx, dy);
-        const ux = L > 1 ? dx / L : 1, uy = L > 1 ? dy / L : 0;
-        const shipR = 6.5 * k + 10;                             // keep labels off the craft itself
-        const r = Math.max(L, shipR) + 10;
-        let cxL = ox + ux * r + (ux >= 0 ? w / 2 : -w / 2), cyL = cy + uy * r + (Math.abs(ux) < 0.4 ? (uy >= 0 ? h / 2 : -h / 2) : 0);
-        return { text, x: cxL - w / 2, y: cyL - h / 2, w, h };
-      };
-      const ba = box(ta, 'a = ' + as + a.toFixed(1) + ' m/s/s'), labels = [ba];
-      if (!comps) {
-        const bv = box(tv, 'v = ' + vs + v.toFixed(1) + ' m/s');
-        const hit = (p, q) => p.x < q.x + q.w + 6 && q.x < p.x + p.w + 6 && p.y < q.y + q.h + 4 && q.y < p.y + p.h + 4;
-        if (hit(bv, ba)) {   // move the a label up or down, whichever way it is already further from v's label
-          const up = (ba.y + ba.h / 2) <= (bv.y + bv.h / 2);
-          ba.y = up ? bv.y - ba.h - 6 : bv.y + bv.h + 6;
-        }
-        labels.push(bv);
-      }
-      if (comps) {
-        drawVComponents(ox, cy, k, tg);
-        // the a label goes on the other side of the ship from the v display
-        const mid = ba.x + ba.w / 2;
-        if (Math.sign(mid - ox) === view.vcDir) ba.x = ox - (mid - ox) - ba.w / 2;
-        ctx.font = '200 14px "JetBrains Mono", ui-monospace, monospace';
-      } else view.vcDir = 0;
-      ctx.fillStyle = '#FFFFFF'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-      for (const b of labels) ctx.fillText(b.text, b.x, b.y + b.h / 2);
-      ctx.textBaseline = 'alphabetic';
-    }
+    drawLabels(vecLabels);               // their labels go on top
     drawTargetPointer();
 
     if (game.paused) {
@@ -1026,7 +1064,7 @@ button.primary { border-width: 2.5px; }
   // ---------- minimap (upgrade from the first team picked up) ----------
   // A strip at the bottom left showing the terrain ahead: 5 km wide, 1.5 km tall, the ship 15% in from
   // the side it is coming from, looking toward the next team. Tune with the numbers below.
-  const MINI = { span: 5000, height: 1500, shipAt: 0.15 };
+  const MINI = { span: 5850, height: 1500, base: -100, shipAt: 0.15 };   // shows heights from -100 m to 1,400 m
   // TUNING: always on for now. When the upgrade system goes in, unlock it with the first pickup:
   // const hasMinimap = () => game.mode === 'practice' || game.picked.size >= 1;
   const hasMinimap = () => true;
@@ -1037,7 +1075,7 @@ button.primary { border-width: 2.5px; }
     g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#000000'; g.fillRect(0, 0, W, H);
     const t = target(), dir = t.x >= s.x ? 1 : -1;
     const left = dir > 0 ? s.x - MINI.span * MINI.shipAt : s.x - MINI.span * (1 - MINI.shipAt);
-    const k = W / MINI.span, base = Math.min(s.y - 3.5, groundAt(s.x)) - MINI.height * 0.35;
+    const k = W / MINI.span, base = MINI.base;   // fixed: the minimap never moves up or down
     const X = x => (x - left) * k, Y = y => H - (y - base) * (H / MINI.height);
     g.strokeStyle = '#FFFFFF'; g.lineWidth = 2; g.lineJoin = 'round'; g.beginPath();
     for (let px = 0; px <= W; px += 4) { const y = Y(groundAt(left + px / k)); px ? g.lineTo(px, y) : g.moveTo(px, y); }
@@ -1048,7 +1086,7 @@ button.primary { border-width: 2.5px; }
       g.fillRect(X(f.x1), Y(f.y) - 2, Math.max(4, (f.x2 - f.x1) * k), 4);
       if (!f.base && !game.picked.has(f)) { g.beginPath(); g.moveTo(X(f.shelterX), Y(f.y) + 26); g.lineTo(X(f.shelterX), Y(f.y) + 8); g.moveTo(X(f.shelterX) - 6, Y(f.y) + 15); g.lineTo(X(f.shelterX), Y(f.y) + 8); g.lineTo(X(f.shelterX) + 6, Y(f.y) + 15); g.stroke(); }
     }
-    g.beginPath(); g.arc(X(s.x), Y(s.y), 6, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.arc(X(s.x), Math.max(6, Math.min(H - 6, Y(s.y))), 6, 0, Math.PI * 2); g.fill();
   }
   function drawFBD() {
     const flying = game.state === 'flying' || game.state === 'ready';
@@ -1228,6 +1266,7 @@ button.primary { border-width: 2.5px; }
     // W: only a fresh press starts the engine, so holding W through a touchdown does not relaunch
     else if (e.key.toLowerCase() === 'w' && !e.repeat && live()) setMain(true);
     else if (e.key.toLowerCase() === 'r' && !e.repeat && game.state !== 'intro') again();
+    else if (e.key.toLowerCase() === 'v' && !e.repeat) toggleComp();
   });
   window.addEventListener('keyup', e => { keys.delete(e.key); if (e.key.toLowerCase() === 'w') setMain(false); });
   window.addEventListener('blur', () => {
@@ -1248,6 +1287,11 @@ button.primary { border-width: 2.5px; }
     document.querySelectorAll('[data-world]').forEach(o => o.setAttribute('aria-pressed', o === b));
     grav = WORLDS[settings.world]; refreshGoal();
   }));
+  function toggleComp() {
+    settings.vcomp = !settings.vcomp;
+    $('bComp').textContent = settings.vcomp ? 'On' : 'Off'; $('bComp').setAttribute('aria-pressed', settings.vcomp);
+  }
+  $('bComp').addEventListener('click', toggleComp);
   $('bMass').addEventListener('click', () => {
     settings.varMass = !settings.varMass;
     $('bMass').textContent = settings.varMass ? 'Changes as fuel burns' : 'Constant';
