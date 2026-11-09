@@ -192,10 +192,10 @@ button.primary { border-width: 2.5px; }
   const LAND_ALT = 20, LAND_OUT_ALT = 25, LAND_H = 60;   // landing view: one cut to a 60 m tall view when descending below 20 m
   const SHELTER_ZOOM = 150;       // close view also starts within 150 m (straight line) of the next shelter
   const LEG = 4;                  // half the distance between the feet, m
-  // arrow lengths scale with the zoom: these are the lengths in the 120 m close view (px per m/s, px per m/s/s);
-  // a view showing twice as much ground draws the arrows half as long
-  const V_REF = 2, A_REF = 12;
-  const arrowZoom = () => (pxH / view.scale > 0 ? 120 / (pxH / view.scale) : 1);
+  // arrow lengths grow as the view zooms in: these are the lengths in the far view (px per m/s, px per m/s/s);
+  // the close view (5x closer) draws them 5x longer, the landing view 10x
+  const V_REF = 2, A_REF = 4;
+  const arrowZoom = () => FAR_H / (pxH / view.scale);
 
   // ---------- pickups ----------
   const DEBRIS = 30;              // m: landing closer than this to a shelter hurts people inside
@@ -317,11 +317,10 @@ button.primary { border-width: 2.5px; }
     for (let i = 0; i < ctrl.length - 1; i++) fractal(ctrl[i], ctrl[i + 1], 0.09, 8, out);
     return out;
   }
+  // two layers: far (moves at 25% of the foreground's speed across the screen) and near (50%)
   const BG_DEPTHS = [
-    { p: 0.15, alpha: 0.30, w: 0.6,  hMin: 260, hMax: 480, gap: [700, 1300] },
-    { p: 0.27, alpha: 0.40, w: 0.65, hMin: 180, hMax: 380, gap: [600, 1100] },
-    { p: 0.40, alpha: 0.50, w: 0.7,  hMin: 110, hMax: 260, gap: [500, 950] },
-    { p: 0.55, alpha: 0.62, w: 0.75, hMin: 50,  hMax: 160, gap: [400, 800] }
+    { p: 0.25, alpha: 0.35, w: 0.6,  hMin: 50, hMax: 130, gap: [450, 900] },
+    { p: 0.5,  alpha: 0.6,  w: 0.75, hMin: 25, hMax: 75,  gap: [300, 650] }
   ];
   for (const D of BG_DEPTHS) {
     D.m = [];
@@ -761,13 +760,15 @@ button.primary { border-width: 2.5px; }
       for (let i = 1; i < pts.length - 1; i++) { const [x, y] = pts[i], [nx, ny] = pts[i + 1]; ctx.quadraticCurveTo(x, y, (x + nx) / 2, (y + ny) / 2); }
       const L = pts[pts.length - 1]; ctx.lineTo(L[0], L[1]);
     };
+    // Distant mountains are drawn at the far view's scale in every view (zooming in on the ship does not
+    // magnify them) and sit on a fixed horizon line 28% up the screen, so they never rise or sink.
+    // Sideways they slide at 25% / 50% of the ship's ground speed (in far-view pixels).
+    const kf = pxH / FAR_H, camC = view.x + pxW / view.scale / 2, horizon = pxH * 0.72;
     for (const D of BG_DEPTHS) {
-      const shift = (1 - D.p) * view.x;              // mountain x lines up with world x = x + shift
       for (const M of D.m) {
-        const cx = M.x + shift;
-        if (SX(cx + M.w / 2) < -20 || SX(cx - M.w / 2) > pxW + 20) continue;
-        const base = smoothAt(cx) - 20;                // foot sits a little below the general ground level
-        const pts = M.shape.map(([dx, h]) => [SX(cx + dx), SY(base + h)]);
+        const sx = (M.x - D.p * camC) * kf + pxW / 2;
+        if (sx + M.w / 2 * kf < -20 || sx - M.w / 2 * kf > pxW + 20) continue;
+        const pts = M.shape.map(([dx, h]) => [sx + dx * kf, horizon - h * kf]);
         ctx.beginPath(); curve(pts); ctx.lineTo(pts[pts.length - 1][0], pxH + 10); ctx.lineTo(pts[0][0], pxH + 10); ctx.closePath();
         ctx.fillStyle = '#000000'; ctx.fill();
         ctx.save(); ctx.globalAlpha = D.alpha; ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = D.w; ctx.lineJoin = 'round';
