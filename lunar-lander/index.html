@@ -1,0 +1,1008 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Lunar Lander</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap">
+<style>
+/* Layout: full-width moonscape; fuel gauge top left, engine top right, next team middle right, altitude bottom right (close view).
+   Look: old vector-display arcade game. Black screen, thin white lines. Single dark look. */
+:root {
+  --bg: #000000;
+  --line: #FFFFFF;
+  --font: "Share Tech Mono", ui-monospace, Consolas, monospace;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  margin: 0; overflow: hidden; background: var(--bg); color: var(--line);
+  font-family: var(--font); font-size: 16px; line-height: 1.4; letter-spacing: .04em;
+}
+p { margin: 0; }
+
+.app {
+  height: 100%;
+  display: grid; grid-template-rows: minmax(0, 1fr); gap: 0;
+  padding-block: 16px 16px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.stage { position: relative; min-height: 0; background: var(--bg); border: 1.5px solid var(--line); overflow: hidden; }
+canvas#cv { display: block; width: 100%; height: 100%; }
+
+.panel { background: var(--bg); border: 1.5px solid var(--line); padding: 12px 18px; }
+
+.status { display: flex; align-items: center; justify-content: space-between; gap: 12px 24px; flex-wrap: wrap; }
+.cell { display: grid; gap: 2px; }
+.cell .lbl { font-size: 14px; white-space: nowrap; }
+.cell .val { font-size: 19px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.nav {
+  position: absolute; right: 18px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 10px;
+  pointer-events: none;
+}
+.nav canvas { width: 56px; height: 56px; display: block; }
+.nav .big { font-size: 30px; line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.nav .small { font-size: 16px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.overlay {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(860px, calc(100% - 48px)); max-height: calc(100% - 20px); overflow-y: auto; text-align: center;
+  display: grid; gap: 10px; justify-items: center; padding: 14px 20px;
+}
+.overlay h2 { font-weight: 400; font-size: 1.5rem; margin: 0; letter-spacing: .08em; }
+.keyline { display: grid; grid-template-columns: auto auto auto auto; gap: 4px 14px; text-align: left; font-size: 15px; }
+#ovGoal { font-size: 15px; max-width: 78ch; }
+#ovHover { font-size: 15px; max-width: 78ch; }
+.keyline b { font-weight: 400; }
+.results { display: grid; grid-template-columns: auto auto; gap: 4px 24px; text-align: left; font-variant-numeric: tabular-nums; }
+.btnrow { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; }
+.btnrow .lbl { font-size: 15px; margin-right: 4px; }
+button {
+  font: inherit; font-size: 16px; color: var(--line); background: var(--bg);
+  border: 1.5px solid var(--line); border-radius: 0; padding: 6px 14px; cursor: pointer; min-height: 36px;
+}
+button:hover { background: #333333; }
+button[aria-pressed="true"] { background: var(--line); color: var(--bg); }
+button:focus-visible { outline: 2px dashed var(--line); outline-offset: 3px; }
+button.primary { border-width: 2.5px; }
+.graphs { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+.graphs canvas { width: 360px; height: 210px; display: block; }
+
+.powerbar {
+  position: absolute; top: 14px; right: 14px; display: flex; align-items: center; gap: 10px;
+  border: 1.5px solid var(--line); background: var(--bg); padding: 6px 12px; font-size: 15px;
+}
+.powerbar .bar { width: 120px; height: 14px; border: 1.5px solid var(--line); padding: 2px; }
+.powerbar .bar i { display: block; height: 100%; background: var(--line); }
+.powerbar #rPow { min-width: 4ch; text-align: center; padding: 0 6px; border: 1.5px solid var(--line); }
+.powerbar #rPow.on { background: var(--line); color: var(--bg); }
+.powerbar #rThr { min-width: 4ch; text-align: right; font-variant-numeric: tabular-nums; }
+
+.fuelbox {
+  position: absolute; top: 14px; left: 14px; display: flex; align-items: center; gap: 10px;
+  border: 1.5px solid var(--line); background: var(--bg); padding: 6px 12px; font-size: 15px;
+}
+.fuelbox .bar { width: 160px; height: 14px; border: 1.5px solid var(--line); padding: 2px; }
+.fuelbox .bar i { display: block; height: 100%; background: var(--line); }
+.fuelbox #rF { min-width: 4ch; text-align: right; font-variant-numeric: tabular-nums; }
+.altbig {
+  position: absolute; right: 18px; bottom: 14px; text-align: right; pointer-events: none;
+  font-variant-numeric: tabular-nums; line-height: 1.05;
+}
+.altbig .lbl { font-size: 18px; }
+.altbig .num { font-size: 64px; white-space: nowrap; }
+.fbd {
+  position: absolute; top: 62px; left: 14px; border: 1.5px solid var(--line); background: var(--bg);
+  padding: 8px 12px; display: grid; gap: 4px; font-size: 14px; font-variant-numeric: tabular-nums;
+}
+.fbd canvas { width: 170px; height: 230px; display: block; justify-self: center; }
+.fbd .row { display: flex; justify-content: space-between; gap: 14px; white-space: nowrap; }
+
+.toast {
+  position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+  border: 1.5px solid var(--line); background: var(--bg); padding: 6px 16px; font-size: 16px;
+  white-space: pre-line; text-align: center; max-width: calc(100% - 520px); min-width: 300px;
+}
+.warning {
+  position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
+  border: 1.5px solid var(--line); padding: 6px 16px; font-size: 18px; background: var(--bg);
+  white-space: nowrap;
+}
+.warning.off { visibility: hidden; }
+
+@media (max-width: 820px) { body { overflow: auto; } .app { height: auto; } .stage { height: 62vh; } }
+</style>
+
+<div class="app">
+  <div class="stage" id="stage">
+    <canvas id="cv"></canvas>
+
+    <div class="fbd" id="fbd" hidden aria-label="Forces on the ship">
+      <canvas id="fbdCanvas" width="340" height="460" aria-hidden="true"></canvas>
+      <div class="row"><span>Thrust</span><span id="fThrust">0 N</span></div>
+      <div class="row"><span>Weight</span><span id="fWeight">0 N</span></div>
+      <div class="row"><span>Net force</span><span id="fNet">0 N</span></div>
+      <div class="row"><span>Mass</span><span id="fMass">0 kg</span></div>
+      <div class="row"><span>a = F / m</span><span id="fA">0 m/s/s</span></div>
+    </div>
+
+    <div class="toast" id="toast" hidden></div>
+    <div class="fuelbox" aria-label="Fuel"><span>Fuel</span><div class="bar"><i id="fuelFill" style="width:100%"></i></div><span id="rF">100%</span></div>
+    <div class="altbig" id="altBig" hidden aria-label="Altitude"><div class="lbl">Altitude</div><div class="num" id="rH">0.0 m</div></div>
+    <div class="powerbar" aria-label="Engine"><span>Engine</span><span id="rPow">OFF</span><div class="bar"><i id="pwFill" style="width:50%"></i></div><span id="rThr">50%</span></div>
+    <div class="nav" aria-label="Next team">
+      <canvas id="navArrow" width="144" height="144" aria-hidden="true"></canvas>
+      <div class="big" id="rNext">–</div>
+    </div>
+    <div class="warning off" id="warn" role="status">Altitude warning: too fast</div>
+
+    <div class="panel overlay" id="overlay">
+      <h2 id="ovTitle">Lunar Lander</h2>
+      <p id="ovGoal"></p>
+      <p id="ovHover" hidden></p>
+      <div class="keyline" id="ovKeys">
+        <b>←  →</b><span>rotate the ship</span>
+        <b>W</b><span>fire the engine (hold)</span>
+        <b>↑  ↓</b><span>throttle up, down (10% steps)</span>
+        <b>Space</b><span>start, pause</span>
+        <b>R</b><span>restart</span>
+      </div>
+      <div class="results" id="ovResults" hidden></div>
+      <div class="graphs" id="ovGraphs" hidden>
+        <canvas id="gP" width="720" height="420" aria-label="P/T graph"></canvas>
+        <canvas id="gV" width="720" height="420" aria-label="V/T graph"></canvas>
+      </div>
+      <div id="menu" class="btnrow" style="display:grid;gap:10px;justify-items:center">
+        <div class="btnrow"><button class="primary" id="bMission">Start mission</button></div>
+        <div class="btnrow"><span class="lbl">Practice landing:</span>
+          <button data-practice="0">Plateau</button><button data-practice="1">Ravine</button><button data-practice="2">Mountain</button><button data-practice="3">Ledge</button><button data-practice="4">Crater</button>
+        </div>
+        <div class="btnrow"><span class="lbl">Educational mode:</span><button id="bEdu" aria-pressed="false">Off</button></div>
+        <div class="btnrow" id="eduOpts" hidden>
+          <span class="lbl">World:</span><button data-world="Moon" aria-pressed="true">Moon</button><button data-world="Mars" aria-pressed="false">Mars</button><button data-world="Ceres" aria-pressed="false">Ceres</button>
+          <span class="lbl" style="margin-left:10px">Mass:</span><button id="bMass" aria-pressed="false">Constant</button>
+        </div>
+      </div>
+      <div class="btnrow" id="ovButtons" hidden>
+        <button class="primary" id="bAgain">Try again</button><button id="bContinue" hidden>Continue</button><button id="bMenu">Main menu</button>
+      </div>
+      <p id="ovText"></p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(() => {
+  // ---------- physics (SI units) ----------
+  const WORLDS = { Moon: 1.62, Mars: 3.71, Ceres: 0.28 };   // surface gravity, m/s/s
+  const MASS = 15000;             // kg, ship with a full tank (held constant unless "Mass: changes" is on)
+  const DRY_MASS = 6800;          // kg, ship with an empty tank (used only when mass changes)
+  const PROP_MASS = MASS - DRY_MASS;
+  const MAX_THRUST = 94000;       // N, the one engine at 100% throttle
+  const START_THROTTLE = 0.5;
+  const FULL_BURN_S = 360;        // seconds a full tank lasts at 100% throttle on the Moon
+  const ROT_RATE = 90;            // degrees per second while an arrow key is held
+  const MAX_TILT = 10;            // degrees from upright allowed at touchdown
+  const SAFE_VY = 2.5, SAFE_VX = 2.0;
+  const ZOOM_IN_ALT = 50, ZOOM_OUT_ALT = 60;   // close view below 50 m above the surface, back out above 60 m
+  const CLOSE_H = 120;            // metres shown top to bottom in the close view
+  const FAR_H = 600;              // metres shown top to bottom in the far view
+  const LAND_ALT = 20, LAND_OUT_ALT = 25, LAND_H = 60;   // landing view: one cut to a 60 m tall view when descending below 20 m
+  const SHELTER_ZOOM = 150;       // close view also starts within 150 m (straight line) of the next shelter
+  const LEG = 4;                  // half the distance between the feet, m
+  const V_SCALE = 2;              // px per m/s for the velocity arrow (both views)
+  const A_SCALE = 12;             // px per m/s/s for the acceleration arrow
+
+  // ---------- pickups ----------
+  const DEBRIS = 30;              // m: landing closer than this to a shelter hurts people inside
+  const REACH = 150;
+  const PTS = { safe: 100, injured: 40, killed: -100, closeMax: 50 };
+  function harm(d) {
+    if (d >= DEBRIS) return { injured: 0, killed: 0 };
+    if (d >= 22) return { injured: 1, killed: 0 };
+    if (d >= 15) return { injured: 2, killed: 0 };
+    if (d >= 8)  return { injured: 2, killed: 1 };
+    return { injured: 2, killed: 2 };
+  }
+
+  // ---------- map: 24 km, fixed; a 500-800 m mountain between each pair of sites ----------
+  const MAP_W = 24000;
+  const BASE = { x1: 900, x2: 1020, y: 200, base: true };
+  const SITES = [
+    { name: 'Plateau',  x1: 3660, x2: 3810, y: 420, side: 'left'  },
+    { name: 'Ravine',   x1: 6990, x2: 7140, y: 30,  side: 'right' },
+    { name: 'Mountain', x1: 10620, x2: 10770, y: 760, side: 'left'  },
+    { name: 'Ledge',    x1: 14700, x2: 14850, y: 380, side: 'right' },
+    { name: 'Crater',   x1: 19740, x2: 19890, y: 120, side: 'left'  }
+  ];
+  for (const t of SITES) t.shelterX = t.side === 'left' ? t.x1 + 5 : t.x2 - 5;
+
+  const CONTROL = [
+    [0, 270], [900, 200], [1020, 200], [1567, 235], [1805, 573], [2165, 1001], [2247, 1043], [2349, 995], [2655, 669], [2927, 348], [3660, 420], [3810, 420], [4680, 470], [4747, 462], [4977, 719], [5326, 1068], [5405, 1092], [5503, 1040], [5799, 720], [6062, 309], [6150, 300], [6600, 250], [6810, 130], [6990, 30], [7140, 30], [7590, 150], [7830, 280], [7924, 288], [8167, 694], [8535, 1087], [8618, 1130], [8722, 1080], [9035, 814], [9313, 442], [9450, 460], [10140, 620], [10620, 760], [10770, 760], [11280, 700], [11557, 613], [11845, 855], [12280, 1175], [12379, 1199], [12502, 1154], [12872, 799], [13200, 360], [13500, 340], [14250, 290], [14700, 380], [14850, 380], [15256, 540], [15390, 660], [16050, 600], [16216, 574], [16485, 878], [16891, 1224], [16983, 1266], [17098, 1233], [17443, 791], [17749, 369], [18000, 340], [18900, 280], [19320, 330], [19560, 220], [19740, 120], [19890, 120], [20370, 230], [20640, 330], [21300, 290], [22350, 230], [23250, 180], [24000, 230]
+  ];
+  const FLATS = [BASE, ...SITES];
+  const isFlat = (a, b) => FLATS.some(f => f.x1 === a[0] && f.x2 === b[0]);
+
+  let seed = 11;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const terrain = [];
+  (function build() {
+    terrain.push(CONTROL[0]);
+    for (let i = 0; i < CONTROL.length - 1; i++) {
+      const a = CONTROL[i], b = CONTROL[i + 1];
+      if (isFlat(a, b)) { terrain.push(b); continue; }
+      const len = b[0] - a[0], sl = (b[1] - a[1]) / len;
+      let n = Math.max(1, Math.round(len / 40));
+      if (Math.abs(sl) < 0.3) {
+        // gentle slopes become rolling bumps, so no stretch looks flat enough to land on.
+        // an odd number of pieces, first bump with the slope and last against it, keeps every piece steep
+        if (n % 2 === 0) n += 1;
+        const piece = len / n, dir = sl >= 0 ? 1 : -1;
+        for (let k = 1; k < n; k++) {
+          const x = a[0] + piece * k, h = piece * (0.24 + rnd() * 0.06) * dir * (k % 2 ? 1 : -1);
+          terrain.push([x, a[1] + sl * (x - a[0]) + h]);
+        }
+      } else {
+        const piece = len / n;
+        const amp = (Math.abs(sl) - 0.16) * piece * 0.45;
+        for (let k = 1; k < n; k++) {
+          const x = a[0] + piece * k;
+          terrain.push([x, a[1] + sl * (x - a[0]) + (rnd() * 2 - 1) * amp]);
+        }
+      }
+      terrain.push(b);
+    }
+  })();
+  // ---------- surface detail ----------
+  // 1) every non-flat stretch is broken up fractally (midpoint displacement) down to ~5 m pieces,
+  //    so slopes look rough and rocky instead of straight lines and regular zig-zags
+  function fractal(a, b, rough, minLen, out) {
+    const len = b[0] - a[0];
+    if (len <= minLen) { out.push(b); return; }
+    const m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + (rnd() * 2 - 1) * len * rough];
+    fractal(a, m, rough, minLen, out); fractal(m, b, rough, minLen, out);
+  }
+  (function roughen() {
+    const out = [terrain[0]];
+    for (let i = 0; i < terrain.length - 1; i++) {
+      const a = terrain[i], b = terrain[i + 1];
+      if (FLATS.some(f => a[0] >= f.x1 && b[0] <= f.x2 && a[1] === f.y && b[1] === f.y)) { out.push(b); continue; }
+      fractal(a, b, 0.13, 5, out);
+    }
+    terrain.length = 0; terrain.push(...out);
+  })();
+  const nearFlat = (x, pad) => FLATS.some(f => x > f.x1 - pad && x < f.x2 + pad);
+  // 2) craters: bowls with raised rims, kept well away from the landing sites
+  const craters = [];
+  for (let x = 150; x < MAP_W - 150; x += 220 + rnd() * 420) {
+    const r = 10 + rnd() * 28;
+    if (!nearFlat(x, r * 1.7 + 25)) craters.push([x, r]);
+  }
+  for (const p of terrain) {
+    for (const [cx, r] of craters) {
+      const u = Math.abs(p[0] - cx) / r;
+      if (u < 1) p[1] += r * 0.07 * u ** 4 - r * 0.3 * (1 - u * u);
+      else if (u < 1.6) p[1] += r * 0.07 * (1 - (u - 1) / 0.6) ** 2;
+    }
+  }
+  // 3) loose rocks and boulders resting on the slopes (drawing only; they do not affect landing)
+  const rocks = [];
+  for (let x = 20; x < MAP_W - 20; x += 12 + rnd() * 45) {
+    if (nearFlat(x, 12)) continue;
+    const r = 0.6 + rnd() * rnd() * 3.5, n = 5 + Math.floor(rnd() * 3), pts = [];
+    for (let k = 0; k <= n; k++) { const a = Math.PI * k / n; pts.push([Math.cos(a) * r * (0.75 + rnd() * 0.4), Math.sin(a) * r * (0.6 + rnd() * 0.5)]); }
+    rocks.push([x, pts]);
+  }
+  // background mountains: a ridge that scrolls sideways at half speed (parallax) and rides on a smoothed
+  // copy of the ground, so it always shows just behind the horizon. Drawn thinner and dimmer.
+  // two layers: a nearer range (half speed) and a taller, fainter far range (quarter speed)
+  function ridgeLine(gapMin, gapMax, hMin, hMax, rough) {
+    const ctrl = [];
+    for (let x = -3000; x < MAP_W + 3000; x += gapMin + rnd() * (gapMax - gapMin)) ctrl.push([x, hMin + rnd() * (hMax - hMin)]);
+    const out = [ctrl[0]];
+    for (let i = 0; i < ctrl.length - 1; i++) fractal(ctrl[i], ctrl[i + 1], rough, 12, out);
+    return out;
+  }
+  const BG_LAYERS = [
+    { p: 0.25, line: ridgeLine(160, 420, 60, 190, 0.16), alpha: 0.35, w: 0.6 },
+    { p: 0.5,  line: ridgeLine(90, 260, 10, 75, 0.15),  alpha: 0.6,  w: 0.75 }
+  ];
+  let bgSmooth = null;   // smoothed ground every 50 m, built after the terrain
+  const stars = [];
+  for (let i = 0; i < 2200; i++) stars.push([-600 + rnd() * (MAP_W + 1200), 60 + rnd() * 2200]);
+
+  function groundAt(x) {
+    if (x < 0) return terrain[0][1] + (-x) * 2.5;
+    if (x > MAP_W) return terrain[terrain.length - 1][1] + (x - MAP_W) * 2.5;
+    let lo = 0, hi = terrain.length - 1;
+    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (terrain[m][0] <= x) lo = m; else hi = m; }
+    const [x0, y0] = terrain[lo], [x1, y1] = terrain[hi];
+    return x1 === x0 ? y0 : y0 + (y1 - y0) * (x - x0) / (x1 - x0);
+  }
+  bgSmooth = [];
+  for (let x = -3000; x <= MAP_W + 3000; x += 50) {
+    // halfway between the average and the highest ground nearby, so the ridge peeks over local peaks too
+    let sum = 0, n = 0, hi = -Infinity;
+    for (let d = -500; d <= 500; d += 50) { const g = groundAt(Math.min(MAP_W, Math.max(0, x + d))); sum += g; n++; hi = Math.max(hi, g); }
+    bgSmooth.push((sum / n + hi) / 2);
+  }
+  const smoothAt = x => { const i = Math.max(0, Math.min(bgSmooth.length - 2, (x + 3000) / 50)); const j = Math.floor(i), f = i - j; return bgSmooth[j] * (1 - f) + bgSmooth[j + 1] * f; };
+  const flatUnder = (xa, xb) => FLATS.find(f => xa >= f.x1 && xb <= f.x2) || null;
+
+  // ---------- state ----------
+  const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+  const nav = document.getElementById('navArrow'), nctx = nav.getContext('2d');
+  const fbdC = document.getElementById('fbdCanvas'), fctx = fbdC.getContext('2d');
+  const stage = document.getElementById('stage');
+  const $ = id => document.getElementById(id);
+  let pxW = 0, pxH = 0, dpr = 1;
+  const keys = new Set();
+  const settings = { edu: false, world: 'Moon', varMass: false };
+  let game, s, view = { x: 0, y: 0, scale: 1, zoomed: false, level: 3 }, toastTimer = null;
+  let grav = WORLDS.Moon;
+
+  // fuel lasts longer on stronger-gravity worlds so a mission stays possible
+  const fuelPerN = () => 100 / (FULL_BURN_S * Math.sqrt(Math.max(1, grav / WORLDS.Moon))) / MAX_THRUST;
+  const shipMass = () => settings.varMass ? DRY_MASS + PROP_MASS * game.fuel / 100 : MASS;
+
+  function setup(mode, practiceIdx) {
+    grav = WORLDS[settings.world];
+    game = {
+      mode, practiceIdx, state: 'landed', paused: false, time: 0, fuel: 100, main: false,
+      throttle: START_THROTTLE, score: 0, tally: { safe: 0, injured: 0, killed: 0 }, picked: new Set(),
+      log: [], logT: 0, wHeld: false
+    };
+    if (mode === 'practice') {
+      const t = SITES[practiceIdx];
+      const sx = (t.x1 + t.x2) / 2 + (t.side === 'left' ? 260 : -260);
+      let top = 0; for (let x = Math.min(sx, t.x1); x <= Math.max(sx, t.x2); x += 10) top = Math.max(top, groundAt(x));
+      s = { x: sx, y: Math.max(t.y + 110, top + 70) + 3.5, vx: 0, vy: 0, rot: 0, ax: 0, ay: -grav, thrusting: false, alt: 0 };
+      s.alt = s.y - 3.5 - groundAt(s.x);
+      game.state = 'ready';
+      view.close = false;
+    } else {
+      s = { x: (BASE.x1 + BASE.x2) / 2, y: BASE.y + 3.5, vx: 0, vy: 0, rot: 0, ax: 0, ay: 0, thrusting: false, alt: 0 };
+      view.close = true;
+    }
+    setMain(false); setThrottle(START_THROTTLE);
+    view.resetY = true; view.place = true; view.landing = false;
+    setScale(); view.x = s.x - pxW / (view.scale || 1) * 0.5;
+    hideToast();
+    $('fbd').hidden = !settings.edu;
+    updateView();
+  }
+
+  function begin(mode, practiceIdx) {
+    setup(mode, practiceIdx);
+    $('overlay').hidden = true;
+    if (mode === 'practice') game.state = 'flying';
+    window.focus();
+  }
+
+  function showMenu() {
+    setup('mission');
+    game.state = 'intro';
+    $('ovTitle').textContent = 'Lunar Lander';
+    $('ovGoal').hidden = false; $('ovKeys').hidden = false; $('menu').hidden = false;
+    $('ovResults').hidden = true; $('ovGraphs').hidden = true; $('ovButtons').hidden = true;
+    $('ovText').textContent = 'Click a button, or press Space to start the mission.';
+    $('fbd').hidden = true;
+    refreshGoal();
+    $('overlay').hidden = false;
+  }
+  function refreshGoal() {
+    $('ovGoal').textContent = 'Pick up all five teams, then land back at base. Land on the flat ground beside each shelter, upright to within 10°, with y velocity under 2.5 m/s and x velocity under 2.0 m/s. Landing closer than 30 m to a shelter hurts the people inside.';
+    $('ovHover').hidden = !settings.edu || game.state !== 'intro';
+    $('ovHover').textContent = `Before you fly: what throttle setting will make the ship hover? Hovering means thrust equals weight. The engine gives ${fmtN(MAX_THRUST)} at 100%, the ship's mass is ${fmt(MASS)} kg, and gravity on ${settings.world === 'Moon' ? 'the Moon' : settings.world} is ${WORLDS[settings.world]} m/s/s.`;
+  }
+  function showEnd(title, text, opts = {}) {
+    $('ovTitle').textContent = title; $('ovText').textContent = text;
+    $('ovGoal').hidden = true; $('ovHover').hidden = true; $('ovKeys').hidden = true; $('menu').hidden = true;
+    $('ovResults').hidden = !opts.results;
+    if (opts.results) {
+      const r = $('ovResults'); r.innerHTML = '';
+      for (const [k, v] of opts.results) { const a = document.createElement('span'); a.textContent = k; const b = document.createElement('span'); b.textContent = v; r.append(a, b); }
+    }
+    $('ovGraphs').hidden = !(settings.edu && game.log.length > 2);
+    if (!$('ovGraphs').hidden) drawGraphs();
+    $('ovButtons').hidden = false;
+    $('bAgain').hidden = !!opts.cont; $('bContinue').hidden = !opts.cont;
+    $('overlay').hidden = false;
+  }
+  function toast(msg, ms = 6000) {
+    const t = $('toast'); t.textContent = msg; t.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(hideToast, ms);
+  }
+  function hideToast() { clearTimeout(toastTimer); $('toast').hidden = true; }
+
+  // ---------- simulation ----------
+  const SHIP = { feet: [[-LEG, -3.5], [LEG, -3.5]], top: [[-2.4, 3.3], [2.4, 3.3]] };
+  function toWorld([lx, ly], st = s) {
+    const r = st.rot * Math.PI / 180;
+    return [st.x + lx * Math.cos(r) + ly * Math.sin(r), st.y - lx * Math.sin(r) + ly * Math.cos(r)];
+  }
+
+  function step(dt) {
+    if (game.paused || (game.state !== 'flying' && game.state !== 'landed')) return;
+    if ($('overlay').hidden === false) return;                 // results showing
+    game.time += dt;
+    if (game.fuel <= 0 && game.main) setMain(false);
+    const thrust = game.main ? game.throttle * MAX_THRUST : 0;
+    const m = shipMass();
+    game.fuel = Math.max(0, game.fuel - fuelPerN() * thrust * dt);
+
+    if (game.state === 'landed') {
+      s.thrusting = thrust > 0; s.ax = 0; s.ay = 0;
+      if (thrust / m > grav) { game.state = 'flying'; s.y += 0.05; game.log = []; }
+      else { if (game.fuel <= 0 && game.mode === 'mission') outOfFuel(); return; }
+    }
+
+    if (keys.has('ArrowLeft'))  s.rot = Math.max(-90, s.rot - ROT_RATE * dt);
+    if (keys.has('ArrowRight')) s.rot = Math.min(90,  s.rot + ROT_RATE * dt);
+    s.thrusting = thrust > 0;
+    const r = s.rot * Math.PI / 180, aT = thrust / m;
+    s.ax = aT * Math.sin(r);
+    s.ay = aT * Math.cos(r) - grav;
+    s.vx += s.ax * dt; s.vy += s.ay * dt;
+    s.x += s.vx * dt; s.y += s.vy * dt;
+    s.alt = s.y - 3.5 - groundAt(s.x);
+
+    // flight log for the P/T and V/T graphs (every 0.1 s, last 40 s)
+    game.logT += dt;
+    if (game.logT >= 0.1) { game.logT = 0; game.log.push([game.time, Math.max(0, s.alt), s.vy]); if (game.log.length > 400) game.log.shift(); }
+
+    const pts = [...SHIP.feet, ...SHIP.top].map(p => toWorld(p));
+    if (pts.some(([x, y]) => y <= groundAt(x))) touchdown();
+  }
+
+  function touchdown() {
+    const feet = SHIP.feet.map(p => toWorld(p));
+    const fa = Math.min(feet[0][0], feet[1][0]), fb = Math.max(feet[0][0], feet[1][0]);
+    const flat = flatUnder(fa, fb);
+    const upright = Math.abs(s.rot) <= MAX_TILT;
+    const slow = s.vy >= -SAFE_VY && Math.abs(s.vx) <= SAFE_VX;
+    const tdv = `Touchdown: ${Math.abs(s.vy).toFixed(1)} m/s down, ${Math.abs(s.vx).toFixed(1)} m/s sideways, ${Math.abs(Math.round(s.rot))}° tilt.`;
+    game.log.push([game.time, 0, s.vy]);
+    setMain(false); s.thrusting = false;
+    if (!(flat && upright && slow)) {
+      const why = !flat ? 'Not a landing site' : !upright ? 'Tilted too far' : 'Too fast';
+      game.state = 'over'; hideToast();
+      showEnd('Crashed', why + '. ' + tdv + ' Press Space to try again.');
+      return;
+    }
+    s.y = flat.y + 3.5; s.rot = 0; s.vx = 0; s.vy = 0; s.ax = 0; s.ay = 0; s.alt = 0;
+    game.state = 'landed';
+
+    if (game.mode === 'practice') {
+      const t = SITES[game.practiceIdx];
+      if (flat !== t) { toast(`Safe landing, but not at the ${t.name.toLowerCase()} shelter.\n${tdv}`); return; }
+      const d = footDist(fa, fb, t), h = harm(d), safe = 4 - h.injured - h.killed;
+      game.state = 'done';
+      showEnd('Landed', tdv + ' Press Space to try again.', { results: [
+        ['Distance from shelter', Math.round(d) + ' m'], ['Safe', safe], ['Injured', h.injured], ['Killed', h.killed],
+        ['Fuel used', Math.round(100 - game.fuel) + '%'], ['Time', fmtTime(game.time)]
+      ] });
+      return;
+    }
+    if (flat.base) {
+      if (game.picked.size === SITES.length) return missionComplete();
+      toast(`Base. ${SITES.length - game.picked.size} teams still out.\n${tdv}`);
+      return;
+    }
+    if (game.picked.has(flat)) { toast('This team is already aboard.\n' + tdv); return; }
+
+    const d = footDist(fa, fb, flat);
+    const h = harm(d), safe = 4 - h.injured - h.killed;
+    const close = d >= DEBRIS ? Math.round(PTS.closeMax * (REACH - d) / (REACH - DEBRIS)) : 0;
+    const pts = safe * PTS.safe + h.injured * PTS.injured + h.killed * PTS.killed + Math.max(0, close);
+    game.score += pts; game.picked.add(flat);
+    game.tally.safe += safe; game.tally.injured += h.injured; game.tally.killed += h.killed;
+    const hurt = [h.injured ? `${h.injured} injured` : '', h.killed ? `${h.killed} killed` : ''].filter(Boolean).join(', ');
+    const msg = `Team picked up ${Math.round(d)} m from the shelter: ${safe} safe${hurt ? ', ' + hurt : ''}. ${pts >= 0 ? '+' : ''}${pts} points`;
+    if (settings.edu) showEnd('Team picked up', msg + '. ' + tdv, { cont: true });
+    else toast(msg + '\n' + tdv);
+  }
+  const footDist = (fa, fb, t) => Math.max(0, Math.min(Math.abs(fa - t.shelterX), Math.abs(fb - t.shelterX)));
+
+  function outOfFuel() {
+    game.state = 'over'; hideToast();
+    showEnd('Out of fuel', 'Press Space to try again.');
+  }
+  function missionComplete() {
+    game.state = 'done'; hideToast();
+    showEnd('Mission complete', 'Press Space to fly again.', { results: [
+      ['Safe', game.tally.safe], ['Injured', game.tally.injured], ['Killed', game.tally.killed],
+      ['Fuel left', Math.ceil(game.fuel) + '%'], ['Time', fmtTime(game.time)], ['Score', game.score]
+    ] });
+  }
+
+  function target() {
+    if (game.mode === 'practice') { const t = SITES[game.practiceIdx]; return { x: t.shelterX, y: t.y, site: t }; }
+    const left = SITES.filter(t => !game.picked.has(t));
+    if (!left.length) return { x: (BASE.x1 + BASE.x2) / 2, y: BASE.y, base: true };
+    let best = null, bd = Infinity;
+    for (const t of left) { const d = Math.hypot(t.shelterX - s.x, t.y - s.y); if (d < bd) { bd = d; best = t; } }
+    return { x: best.shelterX, y: best.y, site: best };
+  }
+
+  // ---------- camera ----------
+  // FAR view (600 m tall): the camera may pan to follow the ship.
+  // CLOSE view: starts when the ship is within 150 m of the next shelter, or less than 50 m above the
+  // surface anywhere. It is placed ONCE and then does not move or zoom at all. Near a shelter it is sized
+  // so the ship and the shelter both fit (never closer than 120 m top to bottom); elsewhere it is 120 m.
+  // Ground at the top of the bottom third. Only if the ship reaches a screen edge does the view cut
+  // (no scrolling) to a new fixed position.
+  function setScale() { view.scale = pxH / (view.close ? (view.closeH || CLOSE_H) : FAR_H); }
+  const shipScale = () => view.scale;               // the ship is always drawn at true size
+  const EDGE = 45, NAV = 340;   // px kept clear: screen edges; on the right the next-team display + the ship's labels
+  const shelterDist = () => { const tg = target(); return tg.site ? Math.hypot(tg.x - s.x, tg.y - s.y) : Infinity; };
+  function placeClose() {
+    const tg = target(), st = tg.site;
+    const nearSite = st && shelterDist() <= SHELTER_ZOOM + 60;
+    const g = nearSite ? Math.min(st.y, groundAt(s.x)) : groundAt(s.x);
+    // height that fits the ship (and its a arrow) above the ground with the ground at the top of the bottom third
+    const need = (s.y + 3.5 - g) / (2 / 3 - 90 / pxH);
+    view.closeH = view.landing ? LAND_H : Math.min(FAR_H, Math.max(CLOSE_H, need));
+    setScale();
+    const k = view.scale, hM = pxH / k, wM = pxW / k;
+    view.y = g - hM / 3;
+    view.y = Math.max(view.y, s.y + 3.5 + 70 / k - hM);
+    view.y = Math.min(view.y, s.y - 3.5 - 30 / k);
+    // sideways: ship and the whole landing site when they fit; otherwise the ship on the side it is coming from
+    const f = s.vx < -0.5 ? 0.8 : s.vx > 0.5 ? 0.2 : 0.5;
+    let vx = s.x - (EDGE + f * (pxW - NAV - EDGE)) / k;
+    if (st) {
+      const shipLo = s.x - (pxW - NAV) / k, shipHi = s.x - EDGE / k;
+      const shLo = st.shelterX - (pxW - EDGE) / k, shHi = st.shelterX - EDGE / k;
+      const lo = Math.max(shipLo, shLo), hi = Math.min(shipHi, shHi);
+      if (lo <= hi) vx = Math.min(hi, Math.max(lo, (Math.min(s.x, st.x1) + Math.max(s.x, st.x2)) / 2 - wM / 2));
+    }
+    view.x = vx;
+  }
+  // far view vertical: NEVER pans. It is set once (ground under the ship at the top of the bottom third)
+  // and only jumps to a new fixed height in one cut if the ship would leave the top or bottom of the
+  // screen, or the ground under the ship would drop below the bottom edge or rise above 70% of the height.
+  function placeFarY() {
+    const hM = pxH / view.scale, k = view.scale;
+    view.y = groundAt(s.x) - hM / 3;
+    view.y = Math.max(view.y, s.y + 3.5 + 140 / k - hM);   // room above the ship for its a arrow
+    view.y = Math.min(view.y, s.y - 3.5 - 40 / k);
+  }
+  function farYNeedsCut() {
+    const top = SY(s.y + 3.5), bot = SY(s.y - 3.5), g = SY(groundAt(s.x));
+    const fits = s.y - groundAt(s.x) < (pxH / view.scale) * 0.5;   // ship low enough that ground and ship fit together
+    return top < 60 || bot > pxH - 20 || (fits && (g > pxH || g < pxH * 0.3));
+  }
+  function updateView() {
+    if (game.state === 'flying' || game.state === 'ready') {
+      const d = shelterDist();
+      const want = view.close ? (s.alt <= ZOOM_OUT_ALT || d <= SHELTER_ZOOM + 20) : (s.alt < ZOOM_IN_ALT || d <= SHELTER_ZOOM);
+      if (want !== view.close) { view.close = want; view.landing = false; view.resetY = true; view.place = true; }
+      // landing view: entered while descending below 20 m, left above 25 m (each change is one instant cut)
+      if (view.close && game.state === 'flying') {
+        const land = view.landing ? s.alt <= LAND_OUT_ALT : (s.alt < LAND_ALT && s.vy < 0);
+        if (land !== view.landing) { view.landing = land; view.place = true; }
+      }
+    }
+    if (view.close) {
+      if (view.place) { placeClose(); view.place = false; return; }
+      setScale();
+      const px = SX(s.x), top = SY(s.y + 3.5), bot = SY(s.y - 3.5);
+      if (px < EDGE || px > pxW - NAV || top < 20 || bot > pxH - 10) placeClose();
+      return;
+    }
+    setScale();
+    if (game.state === 'over' || game.state === 'done') return;
+    if (view.resetY || farYNeedsCut()) { placeFarY(); view.resetY = false; }
+    const wM = pxW / view.scale, margin = wM * 0.3;
+    if (s.x < view.x + margin) view.x = s.x - margin;
+    if (s.x > view.x + wM - margin) view.x = s.x - wM + margin;
+  }
+
+  // ---------- drawing ----------
+  const SX = x => (x - view.x) * view.scale, SY = y => pxH - (y - view.y) * view.scale;
+  const FONT = '14px "Share Tech Mono", ui-monospace, monospace';
+
+  function stroke(pathFn, w = 1.5, c = ctx) {
+    c.strokeStyle = '#FFFFFF'; c.lineWidth = w; c.lineJoin = 'round'; c.lineCap = 'round';
+    c.beginPath(); pathFn(); c.stroke();
+  }
+
+  function shipPaths() {
+    const P = [
+      [[-3, -1.5], [3, -1.5], [3, 0.1], [-3, 0.1], [-3, -1.5]],
+      [[-2, 0.1], [-2.4, 1.5], [-1.2, 3.3], [1.2, 3.3], [2.4, 1.5], [2, 0.1]],
+      [[-.7, 2.4], [.7, 2.4], [.5, 1.5], [-.5, 1.5], [-.7, 2.4]],
+      [[-2.2, -1.5], [-4, -3.5]], [[2.2, -1.5], [4, -3.5]],
+      [[-3, -.7], [-4, -3.5]], [[3, -.7], [4, -3.5]],
+      [[-4.8, -3.5], [-3.2, -3.5]], [[3.2, -3.5], [4.8, -3.5]],
+      [[-.6, -1.5], [-1, -2.2], [1, -2.2], [.6, -1.5]]
+    ];
+    if (s.thrusting) {
+      const L = (4 + Math.random() * 2.5) * (0.3 + 1.1 * game.throttle);
+      P.push([[-.9, -2.2], [0, -2.2 - L], [.9, -2.2]]);
+    }
+    return P;
+  }
+  // where the ship's centre goes on screen. When the ship is drawn larger than true size,
+  // it is anchored at the middle of its feet so the feet sit where the real feet are, never below the ground
+  function shipScreen() {
+    const k = shipScale(), [fx, fy] = toWorld([0, -3.5]);
+    return [SX(fx) + (s.x - fx) * k, SY(fy) - (s.y - fy) * k];
+  }
+  function drawShip() {
+    const k = shipScale(), [cx, cy] = shipScreen();
+    const paths = shipPaths().map(p => p.map(pt => { const [x, y] = toWorld(pt); return [cx + (x - s.x) * k, cy - (y - s.y) * k]; }));
+    stroke(() => { for (const p of paths) p.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); }, 1);
+  }
+
+  function drawShelter(t) {
+    const k = Math.max(view.scale, 10 / 6), cx = SX(t.shelterX), gy = SY(t.y);
+    const r = 3 * k, picked = game.picked.has(t);
+    stroke(() => {
+      ctx.moveTo(cx - r, gy); ctx.arc(cx, gy, r, Math.PI, 0);
+      if (!picked) { ctx.moveTo(cx - r * .35, gy); ctx.lineTo(cx - r * .35, gy - r * .55); ctx.lineTo(cx + r * .35, gy - r * .55); ctx.lineTo(cx + r * .35, gy); }
+    });
+    if (picked) stroke(() => { ctx.moveTo(cx - r, gy - r * 1.2); ctx.lineTo(cx + r, gy - r * 1.2); }, 1);
+    // an arrow under every shelter still waiting, pointing up at it, the same size at every zoom
+    else stroke(() => {
+      ctx.moveTo(cx, gy + 60); ctx.lineTo(cx, gy + 12);
+      ctx.moveTo(cx - 9, gy + 24); ctx.lineTo(cx, gy + 12); ctx.lineTo(cx + 9, gy + 24);
+    }, 2.5);
+    // debris zone: a faint dashed line 30 m out from the shelter, with an end tick
+    if (!picked && view.scale > 1) {
+      const dir = t.side === 'left' ? 1 : -1, ex = SX(t.shelterX + dir * DEBRIS);
+      ctx.save(); ctx.globalAlpha = 0.55; ctx.setLineDash([4, 5]);
+      stroke(() => { ctx.moveTo(cx + dir * r, gy - 6); ctx.lineTo(ex, gy - 6); }, 1);
+      ctx.setLineDash([]);
+      stroke(() => { ctx.moveTo(ex, gy - 12); ctx.lineTo(ex, gy); }, 1);
+      ctx.restore();
+    }
+  }
+
+  function drawBase() {
+    const a = SX(BASE.x1), b = SX(BASE.x2), gy = SY(BASE.y), mid = (a + b) / 2;
+    stroke(() => { ctx.moveTo(a, gy); ctx.lineTo(b, gy); }, 3);
+    const h = Math.max(30, 18 * view.scale);
+    stroke(() => { ctx.moveTo(b - 6, gy); ctx.lineTo(b - 6, gy - h); ctx.lineTo(b - 6 - h * .4, gy - h * .85); ctx.lineTo(b - 6, gy - h * .7); });
+    ctx.fillStyle = '#FFFFFF'; ctx.font = FONT; ctx.textAlign = 'center';
+    ctx.fillText('Base', mid, gy + 20);
+  }
+
+  function arrow(x0, y0, cx, cy, k, text, dy) {
+    const len = Math.hypot(cx, cy) * k;
+    ctx.save(); ctx.strokeStyle = '#FFFFFF'; ctx.fillStyle = '#FFFFFF'; ctx.lineWidth = 1; ctx.font = FONT;
+    if (len >= 4) {
+      const x1 = x0 + cx * k, y1 = y0 - cy * k, ang = Math.atan2(y1 - y0, x1 - x0), hd = Math.min(9, len * .4);
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x1 - hd * Math.cos(ang - .5), y1 - hd * Math.sin(ang - .5));
+      ctx.lineTo(x1, y1); ctx.lineTo(x1 - hd * Math.cos(ang + .5), y1 - hd * Math.sin(ang + .5)); ctx.stroke();
+      const left = Math.cos(ang) < -0.2;
+      ctx.textAlign = left ? 'right' : 'left';
+      ctx.fillText(text, x1 + (left ? -8 : 8), y1 + dy);
+    } else { ctx.textAlign = 'left'; ctx.fillText(text, x0 + 8, y0 + dy); }
+    ctx.restore();
+  }
+
+  function drawTargetPointer() {
+    if (!['flying', 'landed', 'ready'].includes(game.state)) return;
+    const t = target(), tx = SX(t.x), ty = SY(t.y), m = 26;
+    if (tx > m && tx < pxW - m && ty > m && ty < pxH - m) return;
+    const cx = pxW / 2, cy = pxH / 2, dx = tx - cx, dy = ty - cy;
+    const f = Math.min((pxW / 2 - m) / Math.abs(dx || 1e-6), (pxH / 2 - m) / Math.abs(dy || 1e-6));
+    // keep clear of the next-team display in the bottom-right corner
+    let px = cx + dx * f, py = cy + dy * f;
+    if (px > pxW - 260 && Math.abs(py - pxH / 2) < 50) py = pxH / 2 + (py < pxH / 2 ? -50 : 50);
+    ctx.save(); ctx.translate(px, py); ctx.rotate(Math.atan2(dy, dx));
+    stroke(() => { ctx.moveTo(-14, -9); ctx.lineTo(0, 0); ctx.lineTo(-14, 9); ctx.closePath(); }, 2);
+    ctx.restore();
+  }
+
+  // educational mode: dots every 0.5 s along the path the ship would follow with the engine off
+  function drawCoastPath() {
+    let x = s.x, y = s.y - 3.5, vx = s.vx, vy = s.vy;
+    const dt = 0.05;
+    ctx.fillStyle = '#FFFFFF';
+    for (let i = 1; i <= 1200; i++) {
+      vy -= grav * dt; x += vx * dt; y += vy * dt;
+      if (y <= groundAt(x)) break;
+      if (i % 10 === 0) {
+        const px = SX(x), py = SY(y);
+        if (px < -10 || px > pxW + 10 || py > pxH + 10) break;
+        ctx.fillRect(px - 1, py - 1, 2.2, 2.2);
+      }
+    }
+  }
+
+  function draw() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, pxW, pxH);
+    const wM = pxW / view.scale, x0 = view.x - 20, x1 = view.x + wM + 20;
+
+    ctx.fillStyle = '#FFFFFF';
+    for (const [x, y] of stars) {
+      if (x < x0 || x > x1 || y < groundAt(x) + 25) continue;
+      const py = SY(y); if (py > -2 && py < pxH) ctx.fillRect(SX(x), py, 1.2, 1.2);
+    }
+    // background ranges, far then near: black fill hides what is behind, then a thin dim line
+    for (const L of BG_LAYERS) {
+      const shift = (1 - L.p) * view.x;              // ridge point x lines up with world x = x + shift
+      const bg = [];
+      for (const [x, h] of L.line) {
+        const wx = x + shift, px = SX(wx);
+        if (px < -60 || px > pxW + 60) continue;
+        bg.push([px, SY(smoothAt(wx) + h)]);
+      }
+      if (bg.length < 2) continue;
+      ctx.beginPath(); ctx.moveTo(bg[0][0], pxH + 10);
+      for (const [x, y] of bg) ctx.lineTo(x, y);
+      ctx.lineTo(bg[bg.length - 1][0], pxH + 10); ctx.closePath();
+      ctx.fillStyle = '#000000'; ctx.fill();
+      ctx.save(); ctx.globalAlpha = L.alpha;
+      stroke(() => { bg.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); }, L.w);
+      ctx.restore();
+    }
+    // foreground ground (only the part on screen): black fill hides the ranges behind it
+    const xL = view.x - 40, xR = view.x + pxW / view.scale + 40;
+    let i0 = 0, i1 = terrain.length - 1;
+    { let lo = 0, hi = terrain.length - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (terrain[m][0] <= xL) lo = m; else hi = m; } i0 = lo; }
+    { let lo = 0, hi = terrain.length - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (terrain[m][0] < xR) lo = m; else hi = m; } i1 = hi; }
+    const gPath = () => {
+      if (xL < 0) ctx.lineTo(SX(Math.min(xL, -2000)), SY(groundAt(Math.min(xL, -2000))));
+      for (let i = i0; i <= i1; i++) ctx.lineTo(SX(terrain[i][0]), SY(terrain[i][1]));
+      if (xR > MAP_W) ctx.lineTo(SX(Math.max(xR, MAP_W + 2000)), SY(groundAt(Math.max(xR, MAP_W + 2000))));
+    };
+    ctx.beginPath(); ctx.moveTo(-10, pxH + 10); gPath(); ctx.lineTo(pxW + 10, pxH + 10); ctx.closePath();
+    ctx.fillStyle = '#000000'; ctx.fill();
+    ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.5; ctx.lineJoin = 'round'; ctx.beginPath();
+    { const [x, y] = terrain[i0]; ctx.moveTo(SX(xL < 0 ? Math.min(xL, -2000) : x), SY(xL < 0 ? groundAt(Math.min(xL, -2000)) : y)); }
+    gPath(); ctx.stroke();
+    // rocks, only when big enough on screen to read as rocks
+    if (view.scale > 1.2) {
+      ctx.save(); ctx.globalAlpha = 0.85;
+      for (const [x, pts] of rocks) {
+        if (x < xL || x > xR) continue;
+        const gy = groundAt(x);
+        stroke(() => pts.forEach(([dx, dy], i) => i ? ctx.lineTo(SX(x + dx), SY(gy + dy - 0.3)) : ctx.moveTo(SX(x + dx), SY(gy + dy - 0.3))), 1);
+      }
+      ctx.restore();
+    }
+    for (const t of SITES) {
+      if (SX(t.x2) < -60 || SX(t.x1) > pxW + 60) continue;
+      stroke(() => { ctx.moveTo(SX(t.x1), SY(t.y)); ctx.lineTo(SX(t.x2), SY(t.y)); }, 3);
+      drawShelter(t);
+    }
+    drawBase();
+    if (settings.edu && (game.state === 'flying' || game.state === 'ready')) drawCoastPath();
+    drawShip();
+
+    if (game.state === 'flying' || game.state === 'ready') {
+      const k = shipScale(), [ox, oy] = shipScreen();
+      // velocity arrow centred under the ship: its midpoint sits directly below the ship,
+      // low enough that neither end reaches the ship
+      const half = Math.abs(s.vy) * V_SCALE / 2;
+      const mx = ox, my = oy + 3.5 * k + 14 + half;
+      const vx0 = mx - s.vx * V_SCALE / 2, vy0 = my + s.vy * V_SCALE / 2;
+      const v = Math.hypot(s.vx, s.vy), vs = s.vy < 0 && v >= 0.05 ? '−' : '';
+      arrow(vx0, vy0, s.vx, s.vy, V_SCALE, 'v = ' + vs + v.toFixed(1) + ' m/s', -7);
+      // acceleration arrow above the ship, far enough up that pointing down it cannot reach the ship
+      const a = Math.hypot(s.ax, s.ay), as = s.ay < 0 && a >= 0.05 ? '−' : '';
+      const ay0 = oy - 3.5 * k - Math.max(35, A_SCALE * grav + 12);
+      arrow(ox, ay0, s.ax, s.ay, A_SCALE, 'a = ' + as + a.toFixed(1) + ' m/s/s', -7);
+    }
+    drawTargetPointer();
+
+    if (game.paused) {
+      ctx.fillStyle = '#FFFFFF'; ctx.font = '20px "Share Tech Mono", monospace'; ctx.textAlign = 'center';
+      ctx.fillText('Paused (Space to resume)', pxW / 2, 80);
+    }
+    if (game.state === 'ready') {
+      ctx.fillStyle = '#FFFFFF'; ctx.font = '20px "Share Tech Mono", monospace'; ctx.textAlign = 'center';
+      ctx.fillText('Press Space to start', pxW / 2, 80);
+    }
+  }
+
+  // ---------- force diagram (educational mode) ----------
+  function drawFBD() {
+    const flying = game.state === 'flying' || game.state === 'ready';
+    const m = shipMass(), W = m * grav;
+    const T = flying && s.thrusting ? game.throttle * MAX_THRUST : 0;
+    const r = s.rot * Math.PI / 180;
+    const Tx = T * Math.sin(r), Ty = T * Math.cos(r);
+    const onGround = !flying;
+    // on the ground the surface pushes up and the net force is zero
+    const Nx = onGround ? 0 : Tx, Ny = onGround ? 0 : Ty - W;
+    $('fThrust').textContent = fmtN(T);
+    $('fWeight').textContent = fmtN(W);
+    $('fNet').textContent = onGround ? '0 N (on the ground)' : fmtN(Math.hypot(Nx, Ny));
+    $('fMass').textContent = fmt(Math.round(m)) + ' kg';
+    $('fA').textContent = (onGround ? 0 : Math.hypot(Nx, Ny) / m).toFixed(2) + ' m/s/s';
+
+    // one fixed scale (N per pixel) so arrow lengths can be compared; dot at 60% height
+    const Wd = fbdC.width, Hd = fbdC.height, cx = Wd * 0.42, cy = Hd * 0.6;
+    const k = Math.min(0.55 * Hd / MAX_THRUST, 0.34 * Hd / W);
+    fctx.setTransform(1, 0, 0, 1, 0, 0); fctx.clearRect(0, 0, Wd, Hd);
+    fctx.fillStyle = '#FFFFFF'; fctx.font = '24px "Share Tech Mono", monospace';
+    fctx.beginPath(); fctx.arc(cx, cy, 8, 0, Math.PI * 2); fctx.fill();
+    const arr = (ox, fx, fy, label, dash) => {
+      const len = Math.hypot(fx, fy) * k; if (len < 3) return;
+      const x1 = ox + fx * k, y1 = cy - fy * k, ang = Math.atan2(y1 - cy, x1 - ox), hd = Math.min(18, len * .4);
+      fctx.save(); fctx.setLineDash(dash);
+      stroke(() => { fctx.moveTo(ox, cy); fctx.lineTo(x1, y1); }, 4, fctx);
+      fctx.setLineDash([]);
+      stroke(() => { fctx.moveTo(x1 - hd * Math.cos(ang - .45), y1 - hd * Math.sin(ang - .45)); fctx.lineTo(x1, y1); fctx.lineTo(x1 - hd * Math.cos(ang + .45), y1 - hd * Math.sin(ang + .45)); }, 4, fctx);
+      fctx.textAlign = 'left';
+      fctx.fillText(label, Math.min(Wd - 70, x1 + 12), Math.min(Hd - 6, Math.max(22, y1 + (fy > 0 ? 8 : 4))));
+      fctx.restore();
+    };
+    arr(cx, 0, -W, 'W', []);
+    if (onGround) arr(cx, 0, W, 'N', []);
+    else { arr(cx, Tx, Ty, 'T', []); arr(cx + 70, Nx, Ny, 'Fnet', [12, 9]); }
+  }
+
+  // ---------- P/T and V/T graphs (educational mode) ----------
+  function drawGraphs() {
+    const L = game.log, t1 = L[L.length - 1][0];
+    const pts = L.filter(p => p[0] >= t1 - 30);
+    const t0 = pts[0][0];
+    plot($('gP'), pts.map(p => [p[0] - t0, p[1]]), 'P/T graph: altitude', 'm', false);
+    plot($('gV'), pts.map(p => [p[0] - t0, p[2]]), 'V/T graph: y velocity', 'm/s', true);
+  }
+  function niceStep(span) {
+    const raw = span / 4, p = Math.pow(10, Math.floor(Math.log10(raw)));
+    return [1, 2, 5, 10].map(m => m * p).find(v => v >= raw);
+  }
+  function plot(c, data, title, unit, signed) {
+    const g = c.getContext('2d'), W = c.width, H = c.height;
+    g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#000000'; g.fillRect(0, 0, W, H);
+    const L = 92, R = 24, T = 52, B = 70;
+    const tMax = Math.max(1, data[data.length - 1][0]);
+    let yMin = Math.min(...data.map(d => d[1])), yMax = Math.max(...data.map(d => d[1]));
+    if (signed) { const m = Math.max(1, Math.abs(yMin), Math.abs(yMax)); yMin = -m; yMax = m; }
+    else { yMin = 0; yMax = Math.max(5, yMax); }
+    const ys = niceStep(yMax - yMin); yMin = Math.floor(yMin / ys) * ys; yMax = Math.ceil(yMax / ys) * ys;
+    const ts = niceStep(tMax), tTop = Math.ceil(tMax / ts) * ts;
+    const X = t => L + (W - L - R) * t / tTop, Y = v => T + (H - T - B) * (1 - (v - yMin) / (yMax - yMin));
+    g.font = '28px "Share Tech Mono", monospace'; g.fillStyle = '#FFFFFF';
+    g.textAlign = 'left'; g.fillText(title, 10, 34);
+    g.strokeStyle = '#555555'; g.lineWidth = 1;
+    g.textAlign = 'right';
+    for (let v = yMin; v <= yMax + 1e-9; v += ys) { g.beginPath(); g.moveTo(L, Y(v)); g.lineTo(W - R, Y(v)); g.stroke(); g.fillText(+v.toFixed(2), L - 10, Y(v) + 9); }
+    g.textAlign = 'center';
+    for (let t = 0; t <= tTop + 1e-9; t += ts) { g.beginPath(); g.moveTo(X(t), T); g.lineTo(X(t), H - B); g.stroke(); g.fillText(+t.toFixed(1), X(t), H - B + 30); }
+    g.fillText('time (s)', (L + W - R) / 2, H - 4);
+    g.save(); g.translate(26, (T + H - B) / 2 + 30); g.rotate(-Math.PI / 2); g.textAlign = 'left'; g.fillText(unit, 0, 0); g.restore();
+    g.strokeStyle = '#FFFFFF'; g.lineWidth = 1.5;
+    g.beginPath(); g.moveTo(L, T); g.lineTo(L, H - B); g.lineTo(W - R, H - B); g.stroke();
+    if (signed && yMin < 0) { g.beginPath(); g.moveTo(L, Y(0)); g.lineTo(W - R, Y(0)); g.stroke(); }
+    g.lineWidth = 2.5; g.beginPath();
+    data.forEach(([t, v], i) => i ? g.lineTo(X(t), Y(v)) : g.moveTo(X(t), Y(v)));
+    g.stroke();
+  }
+
+  // ---------- next-team arrow ----------
+  function drawNav(dx, dy) {
+    const W = nav.width, c = W / 2;
+    nctx.setTransform(1, 0, 0, 1, 0, 0); nctx.clearRect(0, 0, W, W);
+    nctx.strokeStyle = '#FFFFFF'; nctx.lineCap = 'round'; nctx.lineJoin = 'round';
+    if (Math.hypot(dx, dy) < 1) { nctx.lineWidth = 4; nctx.beginPath(); nctx.arc(c, c, 10, 0, Math.PI * 2); nctx.stroke(); return; }
+    nctx.save(); nctx.translate(c, c); nctx.rotate(Math.atan2(-dy, dx));
+    nctx.lineWidth = 5;
+    nctx.beginPath(); nctx.moveTo(-c * .55, 0); nctx.lineTo(c * .6, 0); nctx.stroke();
+    nctx.beginPath(); nctx.moveTo(c * .25, -c * .3); nctx.lineTo(c * .62, 0); nctx.lineTo(c * .25, c * .3); nctx.stroke();
+    nctx.restore();
+  }
+
+  // ---------- readouts ----------
+  let flash = 0;
+  const fmt = n => Math.round(n).toLocaleString('en-US');
+  const fmtN = n => fmt(n) + ' N';
+  const fmtTime = t => { t = Math.floor(t); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); };
+  const distText = m => m >= 1000 ? (m / 1000).toFixed(1) + ' km' : Math.round(m) + ' m';
+  function updateUI(dt) {
+    const t = target(), dx = t.x - s.x, dy = t.y - (s.y - 3.5);
+    $('rNext').textContent = distText(Math.hypot(dx, dy));
+    drawNav(dx, dy);
+    $('rF').textContent = Math.ceil(game.fuel) + '%';
+    $('fuelFill').style.width = Math.max(0, game.fuel) + '%';
+    // big altitude readout, close view only: feet to the ground directly below
+    $('altBig').hidden = !view.close || game.state === 'intro' || game.state === 'ready';
+    $('rH').textContent = Math.max(0, s.alt).toFixed(1) + ' m';
+    flash += dt;
+    const flying = game.state === 'flying';
+    const danger = flying && s.alt < 10 && (s.vy < -SAFE_VY || Math.abs(s.vx) > SAFE_VX);
+    const lowFuel = (flying || game.state === 'landed') && game.fuel < 10;
+    const w = $('warn');
+    if (danger) w.textContent = 'Altitude warning: too fast';
+    else if (lowFuel) w.textContent = game.fuel <= 0 ? 'Out of fuel' : 'Low on fuel';
+    w.classList.toggle('off', !(danger || lowFuel) || (flash % 0.5) > 0.3);
+    if (settings.edu) drawFBD();
+  }
+
+  // ---------- loop ----------
+  let last = performance.now(), acc = 0;
+  function frame(now) {
+    const dtReal = Math.min(0.1, (now - last) / 1000); last = now; acc += dtReal;
+    const h = 1 / 120;
+    while (acc >= h) { step(h); acc -= h; }
+    updateView(); draw(); updateUI(dtReal);
+    requestAnimationFrame(frame);
+  }
+  function resize() {
+    const r = stage.getBoundingClientRect();
+    dpr = window.devicePixelRatio || 1; pxW = r.width; pxH = r.height;
+    cv.width = Math.round(pxW * dpr); cv.height = Math.round(pxH * dpr);
+    setScale();
+  }
+
+  // ---------- input ----------
+  function setThrottle(t) {
+    game.throttle = Math.round(Math.min(1, Math.max(0.1, t)) * 10) / 10;
+    $('rThr').textContent = Math.round(game.throttle * 100) + '%';
+    $('pwFill').style.width = Math.round(game.throttle * 100) + '%';
+  }
+  function setMain(on) {
+    game.main = on && game.fuel > 0;
+    $('rPow').textContent = game.main ? 'ON' : 'OFF';
+    $('rPow').classList.toggle('on', game.main);
+  }
+  const live = () => (game.state === 'flying' || game.state === 'landed') && !game.paused && $('overlay').hidden;
+  function closeContinue() { if (!$('bContinue').hidden && game.state === 'landed') { $('overlay').hidden = true; return true; } return false; }
+  function again() { begin(game.mode, game.practiceIdx); }
+  function spacePressed() {
+    if (game.state === 'intro') return begin('mission');
+    if (closeContinue()) return;
+    if (game.state === 'over' || game.state === 'done') return again();
+    if (game.state === 'ready') { game.state = 'flying'; return; }
+    if (game.state === 'flying' || game.state === 'landed') game.paused = !game.paused;
+  }
+
+  const ARROWS = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
+  window.addEventListener('keydown', e => {
+    if (ARROWS.includes(e.key)) {
+      e.preventDefault(); keys.add(e.key);
+      if (live() && !e.repeat && e.key === 'ArrowUp') setThrottle(game.throttle + 0.1);
+      if (live() && !e.repeat && e.key === 'ArrowDown') setThrottle(game.throttle - 0.1);
+    }
+    else if (e.key === ' ') { e.preventDefault(); if (!e.repeat) spacePressed(); }
+    // W: only a fresh press starts the engine, so holding W through a touchdown does not relaunch
+    else if (e.key.toLowerCase() === 'w' && !e.repeat && live()) setMain(true);
+    else if (e.key.toLowerCase() === 'r' && !e.repeat && game.state !== 'intro') again();
+  });
+  window.addEventListener('keyup', e => { keys.delete(e.key); if (e.key.toLowerCase() === 'w') setMain(false); });
+  window.addEventListener('blur', () => {
+    keys.clear(); setMain(false);
+    if (game.state === 'flying') game.paused = true;     // pause when the student switches away
+  });
+
+  // buttons (clicking one also gives the page keyboard focus)
+  $('bMission').addEventListener('click', () => begin('mission'));
+  document.querySelectorAll('[data-practice]').forEach(b => b.addEventListener('click', () => begin('practice', +b.dataset.practice)));
+  $('bEdu').addEventListener('click', () => {
+    settings.edu = !settings.edu;
+    $('bEdu').textContent = settings.edu ? 'On' : 'Off'; $('bEdu').setAttribute('aria-pressed', settings.edu);
+    $('eduOpts').hidden = !settings.edu; $('fbd').hidden = !settings.edu; refreshGoal();
+  });
+  document.querySelectorAll('[data-world]').forEach(b => b.addEventListener('click', () => {
+    settings.world = b.dataset.world;
+    document.querySelectorAll('[data-world]').forEach(o => o.setAttribute('aria-pressed', o === b));
+    grav = WORLDS[settings.world]; refreshGoal();
+  }));
+  $('bMass').addEventListener('click', () => {
+    settings.varMass = !settings.varMass;
+    $('bMass').textContent = settings.varMass ? 'Changes as fuel burns' : 'Constant';
+    $('bMass').setAttribute('aria-pressed', settings.varMass);
+  });
+  $('bAgain').addEventListener('click', again);
+  $('bContinue').addEventListener('click', () => { $('overlay').hidden = true; });
+  $('bMenu').addEventListener('click', showMenu);
+  document.querySelectorAll('button').forEach(b => b.addEventListener('keydown', e => { if (e.key === ' ') { e.preventDefault(); } }));
+
+  new ResizeObserver(() => { resize(); }).observe(stage);
+  resize(); showMenu(); requestAnimationFrame(frame);
+})();
+</script>
+
+</body></html>
