@@ -165,7 +165,7 @@ button.primary { border-width: 2.5px; }
         </div>
       </div>
       <div class="btnrow" id="ovButtons" hidden>
-        <button class="primary" id="bAgain">Try again</button><button id="bContinue" hidden>Continue</button><button id="bMenu">Main menu</button>
+        <button class="primary" id="bAgain">Try again</button><button id="bRestart" hidden>Restart mission</button><button id="bContinue" hidden>Continue</button><button id="bMenu">Main menu</button>
       </div>
       <p id="ovText"></p>
     </div>
@@ -192,8 +192,10 @@ button.primary { border-width: 2.5px; }
   const LAND_ALT = 20, LAND_OUT_ALT = 25, LAND_H = 60;   // landing view: one cut to a 60 m tall view when descending below 20 m
   const SHELTER_ZOOM = 150;       // close view also starts within 150 m (straight line) of the next shelter
   const LEG = 4;                  // half the distance between the feet, m
-  const V_SCALE = 2;              // px per m/s for the velocity arrow (both views)
-  const A_SCALE = 12;             // px per m/s/s for the acceleration arrow
+  // arrow lengths scale with the zoom: these are the lengths in the 120 m close view (px per m/s, px per m/s/s);
+  // a view showing twice as much ground draws the arrows half as long
+  const V_REF = 2, A_REF = 12;
+  const arrowZoom = () => (pxH / view.scale > 0 ? 120 / (pxH / view.scale) : 1);
 
   // ---------- pickups ----------
   const DEBRIS = 30;              // m: landing closer than this to a shelter hurts people inside
@@ -207,7 +209,7 @@ button.primary { border-width: 2.5px; }
     return { injured: 2, killed: 2 };
   }
 
-  // ---------- map: 24 km, fixed; a 500-800 m mountain between each pair of sites ----------
+  // ---------- map: 24 km, fixed; a mountain of varied height (170-480 m) between each pair of sites ----------
   const MAP_W = 24000;
   const BASE = { x1: 900, x2: 1020, y: 200, base: true };
   const SITES = [
@@ -220,7 +222,7 @@ button.primary { border-width: 2.5px; }
   for (const t of SITES) t.shelterX = t.side === 'left' ? t.x1 + 5 : t.x2 - 5;
 
   const CONTROL = [
-    [0, 270], [900, 200], [1020, 200], [1567, 235], [1805, 573], [2165, 1001], [2247, 1043], [2349, 995], [2655, 669], [2927, 348], [3660, 420], [3810, 420], [4680, 470], [4747, 462], [4977, 719], [5326, 1068], [5405, 1092], [5503, 1040], [5799, 720], [6062, 309], [6150, 300], [6600, 250], [6810, 130], [6990, 30], [7140, 30], [7590, 150], [7830, 280], [7924, 288], [8167, 694], [8535, 1087], [8618, 1130], [8722, 1080], [9035, 814], [9313, 442], [9450, 460], [10140, 620], [10620, 760], [10770, 760], [11280, 700], [11557, 613], [11845, 855], [12280, 1175], [12379, 1199], [12502, 1154], [12872, 799], [13200, 360], [13500, 340], [14250, 290], [14700, 380], [14850, 380], [15256, 540], [15390, 660], [16050, 600], [16216, 574], [16485, 878], [16891, 1224], [16983, 1266], [17098, 1233], [17443, 791], [17749, 369], [18000, 340], [18900, 280], [19320, 330], [19560, 220], [19740, 120], [19890, 120], [20370, 230], [20640, 330], [21300, 290], [22350, 230], [23250, 180], [24000, 230]
+    [0,  270], [900,  200], [1020,  200], [1541,  234], [1788,  502], [2162,  801], [2247,  830], [2353,  787], [2671,  590], [2953,  350], [3660,  420], [3810,  420], [4680,  470], [4996,  430], [5171,  534], [5436,  647], [5496,  660], [5571,  640], [5796,  488], [5996,  316], [6150,  300], [6600,  250], [6810,  130], [6990,  30], [7140,  30], [7590,  150], [7830,  280], [8198,  311], [8445,  602], [8820,  930], [8905,  958], [9011,  916], [9329,  728], [9612,  498], [10140,  620], [10620,  760], [10770,  760], [11280,  700], [11789,  539], [11999,  679], [12316,  831], [12388,  849], [12477,  821], [12747,  612], [12986,  374], [13500,  340], [14250,  290], [14700,  380], [14850,  380], [15256,  540], [15390,  660], [16050,  600], [16362,  551], [16530,  628], [16785,  711], [16843,  721], [16915,  706], [17131,  569], [17323,  417], [18000,  340], [18900,  280], [19320,  330], [19560,  220], [19740,  120], [19890,  120], [20370,  230], [20640,  330], [21300,  290], [22350,  230], [23250,  180], [24000,  230]
   ];
   const FLATS = [BASE, ...SITES];
   const isFlat = (a, b) => FLATS.some(f => f.x1 === a[0] && f.x2 === b[0]);
@@ -352,7 +354,7 @@ button.primary { border-width: 2.5px; }
     game = {
       mode, practiceIdx, state: 'landed', paused: false, time: 0, fuel: 100, main: false,
       throttle: START_THROTTLE, score: 0, tally: { safe: 0, injured: 0, killed: 0 }, picked: new Set(),
-      log: [], logT: 0, wHeld: false
+      log: [], logT: 0, wHeld: false, cp: null
     };
     if (mode === 'practice') {
       const t = SITES[practiceIdx];
@@ -409,6 +411,9 @@ button.primary { border-width: 2.5px; }
     if (!$('ovGraphs').hidden) drawGraphs();
     $('ovButtons').hidden = false;
     $('bAgain').hidden = !!opts.cont; $('bContinue').hidden = !opts.cont;
+    const cpOn = game.mode === 'mission' && game.cp && game.state === 'over';
+    $('bAgain').textContent = cpOn ? `Restart from ${game.cp.site.name.toLowerCase()}` : 'Try again';
+    $('bRestart').hidden = !cpOn;
     $('overlay').hidden = false;
   }
   function toast(msg, ms = 6000) {
@@ -435,12 +440,14 @@ button.primary { border-width: 2.5px; }
 
     if (game.state === 'landed') {
       s.thrusting = thrust > 0; s.ax = 0; s.ay = 0;
-      if (thrust / m > grav) { game.state = 'flying'; s.y += 0.05; game.log = []; }
+      if (thrust / m > grav) { game.state = 'flying'; s.y += 0.05; game.log = []; game.liftLock = true; }
       else { if (game.fuel <= 0 && game.mode === 'mission') outOfFuel(); return; }
     }
 
-    if (keys.has('ArrowLeft'))  s.rot = Math.max(-90, s.rot - ROT_RATE * dt);
-    if (keys.has('ArrowRight')) s.rot = Math.min(90,  s.rot + ROT_RATE * dt);
+    // after liftoff the ship stays upright until its feet are 5 m clear of the ground
+    if (game.liftLock && s.alt >= 5) game.liftLock = false;
+    if (!game.liftLock && keys.has('ArrowLeft'))  s.rot = Math.max(-90, s.rot - ROT_RATE * dt);
+    if (!game.liftLock && keys.has('ArrowRight')) s.rot = Math.min(90,  s.rot + ROT_RATE * dt);
     s.thrusting = thrust > 0;
     const r = s.rot * Math.PI / 180, aT = thrust / m;
     s.ax = aT * Math.sin(r);
@@ -469,7 +476,7 @@ button.primary { border-width: 2.5px; }
     if (!(flat && upright && slow)) {
       const why = !flat ? 'Not a landing site' : !upright ? 'Tilted too far' : 'Too fast';
       game.state = 'over'; hideToast();
-      showEnd('Crashed', why + '. ' + tdv + ' Press Space to try again.');
+      showEnd('Crashed', why + '. ' + tdv + (game.mode === 'mission' && game.cp ? ` Press Space to restart from the ${game.cp.site.name.toLowerCase()} shelter, or R to restart the mission.` : ' Press Space to try again.'));
       return;
     }
     s.y = flat.y + 3.5; s.rot = 0; s.vx = 0; s.vy = 0; s.ax = 0; s.ay = 0; s.alt = 0;
@@ -499,6 +506,8 @@ button.primary { border-width: 2.5px; }
     const pts = safe * PTS.safe + h.injured * PTS.injured + h.killed * PTS.killed + Math.max(0, close);
     game.score += pts; game.picked.add(flat);
     game.tally.safe += safe; game.tally.injured += h.injured; game.tally.killed += h.killed;
+    // checkpoint: a crash or running out of fuel later restarts here, landed at this shelter
+    game.cp = { site: flat, x: s.x, score: game.score, tally: { ...game.tally }, picked: [...game.picked], fuel: game.fuel, time: game.time };
     const hurt = [h.injured ? `${h.injured} injured` : '', h.killed ? `${h.killed} killed` : ''].filter(Boolean).join(', ');
     const msg = `Team picked up ${Math.round(d)} m from the shelter: ${safe} safe${hurt ? ', ' + hurt : ''}. ${pts >= 0 ? '+' : ''}${pts} points`;
     if (settings.edu) showEnd('Team picked up', msg + '. ' + tdv, { cont: true });
@@ -508,7 +517,7 @@ button.primary { border-width: 2.5px; }
 
   function outOfFuel() {
     game.state = 'over'; hideToast();
-    showEnd('Out of fuel', 'Press Space to try again.');
+    showEnd('Out of fuel', game.mode === 'mission' && game.cp ? `Press Space to restart from the ${game.cp.site.name.toLowerCase()} shelter, or R to restart the mission.` : 'Press Space to try again.');
   }
   function missionComplete() {
     game.state = 'done'; hideToast();
@@ -568,12 +577,12 @@ button.primary { border-width: 2.5px; }
     const hM = pxH / view.scale, k = view.scale;
     view.y = groundAt(s.x) - hM / 3;
     view.y = Math.max(view.y, s.y + 3.5 + 140 / k - hM);   // room above the ship for its a arrow
-    view.y = Math.min(view.y, s.y - 3.5 - 40 / k);
+    view.y = Math.min(view.y, s.y - 0.45 * hM);              // ship never below the middle of the screen
   }
   function farYNeedsCut() {
     const top = SY(s.y + 3.5), bot = SY(s.y - 3.5), g = SY(groundAt(s.x));
     const fits = s.y - groundAt(s.x) < (pxH / view.scale) * 0.5;   // ship low enough that ground and ship fit together
-    return top < 60 || bot > pxH - 20 || (fits && (g > pxH || g < pxH * 0.3));
+    return top < 60 || SY(s.y) > pxH * 0.62 || (fits && (g > pxH || g < pxH * 0.3));
   }
   function updateView() {
     if (game.state === 'flying' || game.state === 'ready') {
@@ -782,6 +791,7 @@ button.primary { border-width: 2.5px; }
       const k = shipScale(), [ox, oy] = shipScreen();
       // velocity arrow centred under the ship: its midpoint sits directly below the ship,
       // low enough that neither end reaches the ship
+      const V_SCALE = V_REF * arrowZoom(), A_SCALE = A_REF * arrowZoom();
       const half = Math.abs(s.vy) * V_SCALE / 2;
       const mx = ox, my = oy + 3.5 * k + 14 + half;
       const vx0 = mx - s.vx * V_SCALE / 2, vy0 = my + s.vy * V_SCALE / 2;
@@ -789,7 +799,7 @@ button.primary { border-width: 2.5px; }
       arrow(vx0, vy0, s.vx, s.vy, V_SCALE, 'v = ' + vs + v.toFixed(1) + ' m/s', -7);
       // acceleration arrow above the ship, far enough up that pointing down it cannot reach the ship
       const a = Math.hypot(s.ax, s.ay), as = s.ay < 0 && a >= 0.05 ? '−' : '';
-      const ay0 = oy - 3.5 * k - Math.max(35, A_SCALE * grav + 12);
+      const ay0 = oy - 3.5 * k - Math.max(20, A_SCALE * grav + 12);
       arrow(ox, ay0, s.ax, s.ay, A_SCALE, 'a = ' + as + a.toFixed(1) + ' m/s/s', -7);
     }
     drawTargetPointer();
@@ -951,10 +961,22 @@ button.primary { border-width: 2.5px; }
   const live = () => (game.state === 'flying' || game.state === 'landed') && !game.paused && $('overlay').hidden;
   function closeContinue() { if (!$('bContinue').hidden && game.state === 'landed') { $('overlay').hidden = true; return true; } return false; }
   function again() { begin(game.mode, game.practiceIdx); }
+  // back to the last checkpoint: landed at the last shelter picked up, with the score, teams and fuel
+  // the ship had at that moment
+  function fromCheckpoint() {
+    const cp = game.cp;
+    if (!cp || game.mode !== 'mission') return again();
+    setup('mission');
+    Object.assign(game, { score: cp.score, tally: { ...cp.tally }, picked: new Set(cp.picked), fuel: cp.fuel, time: cp.time, cp });
+    Object.assign(s, { x: cp.x, y: cp.site.y + 3.5, vx: 0, vy: 0, rot: 0, ax: 0, ay: 0, alt: 0 });
+    view.close = true; view.landing = false; view.place = true; view.resetY = true;
+    $('overlay').hidden = true; window.focus();
+  }
+  const tryAgain = () => (game.state === 'over' && game.cp ? fromCheckpoint() : again());
   function spacePressed() {
     if (game.state === 'intro') return begin('mission');
     if (closeContinue()) return;
-    if (game.state === 'over' || game.state === 'done') return again();
+    if (game.state === 'over' || game.state === 'done') return tryAgain();
     if (game.state === 'ready') { game.state = 'flying'; return; }
     if (game.state === 'flying' || game.state === 'landed') game.paused = !game.paused;
   }
@@ -995,7 +1017,8 @@ button.primary { border-width: 2.5px; }
     $('bMass').textContent = settings.varMass ? 'Changes as fuel burns' : 'Constant';
     $('bMass').setAttribute('aria-pressed', settings.varMass);
   });
-  $('bAgain').addEventListener('click', again);
+  $('bAgain').addEventListener('click', tryAgain);
+  $('bRestart').addEventListener('click', again);
   $('bContinue').addEventListener('click', () => { $('overlay').hidden = true; });
   $('bMenu').addEventListener('click', showMenu);
   document.querySelectorAll('button').forEach(b => b.addEventListener('keydown', e => { if (e.key === ' ') { e.preventDefault(); } }));
