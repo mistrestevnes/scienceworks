@@ -36,16 +36,15 @@
   }
   .wrap { width: 100%; max-width: 1040px; margin: 0 auto; padding: 56px 20px 40px; flex: 1; }
   h1 {
-    font-size: clamp(42px, 8vw, 76px);
+    font-size: clamp(30px, 5vw, 44px);
     line-height: 1.05;
-    margin: 0 0 14px;
+    margin: 0 0 36px;
     letter-spacing: -0.01em;
     background: linear-gradient(180deg, var(--ink) 30%, var(--aqua) 130%);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
   }
-  .lede { max-width: 60ch; color: var(--ink); margin: 0 0 44px; }
   .grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
@@ -82,22 +81,14 @@
 <body>
 <main class="wrap">
   <h1>ScienceWorks</h1>
-  <p class="lede">Interactive simulations for physics and chemistry. Everything here is free to use and adapt for teaching and learning.</p>
 
-  <!-- To add a sim: copy one of the <a class="card"> blocks below, change the link, title and blurb. -->
+  <!-- To add a sim, put this inside the grid:
+    <a class="card" href="/folder-name/">
+      <h2>Title</h2>
+      <p>Short description.</p>
+    </a>
+  -->
   <div class="grid">
-    <a class="card" href="/galileos-ramps/">
-      <h2>Galileo's Ramps</h2>
-      <p>Release a ball on one ramp and see where it stops on another. Change the gap, the height, and the friction.</p>
-    </a>
-    <a class="card" href="/free-fall-tracker/">
-      <h2>Free-Fall Tracker</h2>
-      <p>Mark a falling ball frame by frame in real video and measure g from your own data.</p>
-    </a>
-    <a class="card" href="/chasing-the-ether/">
-      <h2>Chasing the Ether</h2>
-      <p>From Young's two slits to Michelson and Morley: how light was shown to be a wave, and what the ether experiment found.</p>
-    </a>
   </div>
 </main>
 <footer>
