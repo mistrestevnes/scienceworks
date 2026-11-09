@@ -238,13 +238,14 @@ button.primary { border-width: 2.5px; }
       const len = b[0] - a[0], sl = (b[1] - a[1]) / len;
       let n = Math.max(1, Math.round(len / 40));
       if (Math.abs(sl) < 0.3) {
-        // gentle slopes become rolling bumps, so no stretch looks flat enough to land on.
-        // an odd number of pieces, first bump with the slope and last against it, keeps every piece steep
-        if (n % 2 === 0) n += 1;
-        const piece = len / n, dir = sl >= 0 ? 1 : -1;
-        for (let k = 1; k < n; k++) {
-          const x = a[0] + piece * k, h = piece * (0.24 + rnd() * 0.06) * dir * (k % 2 ? 1 : -1);
-          terrain.push([x, a[1] + sl * (x - a[0]) + h]);
+        // gentle stretches: irregular rolling ground, rounded humps and dips of varying size (like a hand-drawn line)
+        let x = a[0], ph = rnd() * Math.PI * 2;
+        const waves = [[40 + rnd() * 50, 2 + rnd() * 3], [110 + rnd() * 90, 4 + rnd() * 6], [260 + rnd() * 200, 6 + rnd() * 10]];
+        const env = u => Math.sin(Math.PI * u);      // fades to zero at both ends so it meets the sites cleanly
+        for (x = a[0] + 12; x < b[0] - 6; x += 12) {
+          const u = (x - a[0]) / len;
+          let h = 0; for (const [wl, amp] of waves) h += amp * Math.sin(2 * Math.PI * x / wl + ph * wl);
+          terrain.push([x, a[1] + sl * (x - a[0]) + h * env(u)]);
         }
       } else {
         const piece = len / n;
@@ -271,7 +272,7 @@ button.primary { border-width: 2.5px; }
     for (let i = 0; i < terrain.length - 1; i++) {
       const a = terrain[i], b = terrain[i + 1];
       if (FLATS.some(f => a[0] >= f.x1 && b[0] <= f.x2 && a[1] === f.y && b[1] === f.y)) { out.push(b); continue; }
-      fractal(a, b, 0.13, 5, out);
+      fractal(a, b, 0.07, 5, out);   // gentle, rounded unevenness (drawn as smooth curves)
     }
     terrain.length = 0; terrain.push(...out);
   })();
@@ -299,18 +300,37 @@ button.primary { border-width: 2.5px; }
   }
   // background mountains: a ridge that scrolls sideways at half speed (parallax) and rides on a smoothed
   // copy of the ground, so it always shows just behind the horizon. Drawn thinner and dimmer.
-  // two layers: a nearer range (half speed) and a taller, fainter far range (quarter speed)
-  function ridgeLine(gapMin, gapMax, hMin, hMax, rough) {
-    const ctrl = [];
-    for (let x = -3000; x < MAP_W + 3000; x += gapMin + rnd() * (gapMax - gapMin)) ctrl.push([x, hMin + rnd() * (hMax - hMin)]);
+  // Background: separate mountains at four depths. Each depth slides past at its own speed (parallax):
+  // the farthest at 15% of the ship's speed, the nearest at 55%, so they move against each other and the
+  // foreground and give a sense of depth. Farther ones are fainter. Each is drawn filled black so nearer
+  // mountains hide the ones behind them.
+  function mountainShape(w, h) {
+    // a lumpy outline: foot, shoulders and ledges up to one peak, then down; then roughened
+    const ctrl = [[-w / 2, 0]], n = 3 + Math.floor(rnd() * 3), px = (rnd() - 0.5) * w * 0.3;
+    for (let k = 1; k <= n; k++) { const f = k / (n + 1); ctrl.push([-w / 2 + (px + w / 2) * f, h * (f ** 0.9) * (0.85 + rnd() * 0.25)]); }
+    ctrl.push([px, h]);
+    if (rnd() < 0.5) ctrl.push([px + w * (0.06 + rnd() * 0.08), h * (0.97 + rnd() * 0.03)]);   // flat-ish top
+    for (let k = n; k >= 1; k--) { const f = k / (n + 1); ctrl.push([w / 2 - (w / 2 - px) * f, h * (f ** 0.9) * (0.8 + rnd() * 0.3)]); }
+    ctrl.push([w / 2, 0]);
+    ctrl.sort((a, b) => a[0] - b[0]);
     const out = [ctrl[0]];
-    for (let i = 0; i < ctrl.length - 1; i++) fractal(ctrl[i], ctrl[i + 1], rough, 12, out);
+    for (let i = 0; i < ctrl.length - 1; i++) fractal(ctrl[i], ctrl[i + 1], 0.09, 8, out);
     return out;
   }
-  const BG_LAYERS = [
-    { p: 0.25, line: ridgeLine(160, 420, 60, 190, 0.16), alpha: 0.35, w: 0.6 },
-    { p: 0.5,  line: ridgeLine(90, 260, 10, 75, 0.15),  alpha: 0.6,  w: 0.75 }
+  const BG_DEPTHS = [
+    { p: 0.15, alpha: 0.30, w: 0.6,  hMin: 260, hMax: 480, gap: [700, 1300] },
+    { p: 0.27, alpha: 0.40, w: 0.65, hMin: 180, hMax: 380, gap: [600, 1100] },
+    { p: 0.40, alpha: 0.50, w: 0.7,  hMin: 110, hMax: 260, gap: [500, 950] },
+    { p: 0.55, alpha: 0.62, w: 0.75, hMin: 50,  hMax: 160, gap: [400, 800] }
   ];
+  for (const D of BG_DEPTHS) {
+    D.m = [];
+    for (let x = -2500; x < MAP_W * D.p + 4000; x += D.gap[0] + rnd() * (D.gap[1] - D.gap[0])) {
+      const h = D.hMin + rnd() * (D.hMax - D.hMin), w = h * (2.2 + rnd() * 1.6);
+      D.m.push({ x, w, shape: mountainShape(w, h) });
+    }
+  }
+
   let bgSmooth = null;   // smoothed ground every 50 m, built after the terrain
   const stars = [];
   for (let i = 0; i < 2200; i++) stars.push([-600 + rnd() * (MAP_W + 1200), 60 + rnd() * 2200]);
@@ -735,23 +755,24 @@ button.primary { border-width: 2.5px; }
       if (x < x0 || x > x1 || y < groundAt(x) + 25) continue;
       const py = SY(y); if (py > -2 && py < pxH) ctx.fillRect(SX(x), py, 1.2, 1.2);
     }
-    // background ranges, far then near: black fill hides what is behind, then a thin dim line
-    for (const L of BG_LAYERS) {
-      const shift = (1 - L.p) * view.x;              // ridge point x lines up with world x = x + shift
-      const bg = [];
-      for (const [x, h] of L.line) {
-        const wx = x + shift, px = SX(wx);
-        if (px < -60 || px > pxW + 60) continue;
-        bg.push([px, SY(smoothAt(wx) + h)]);
+    // background mountains, farthest first
+    const curve = pts => {   // smooth curve through the points (quadratic through midpoints)
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length - 1; i++) { const [x, y] = pts[i], [nx, ny] = pts[i + 1]; ctx.quadraticCurveTo(x, y, (x + nx) / 2, (y + ny) / 2); }
+      const L = pts[pts.length - 1]; ctx.lineTo(L[0], L[1]);
+    };
+    for (const D of BG_DEPTHS) {
+      const shift = (1 - D.p) * view.x;              // mountain x lines up with world x = x + shift
+      for (const M of D.m) {
+        const cx = M.x + shift;
+        if (SX(cx + M.w / 2) < -20 || SX(cx - M.w / 2) > pxW + 20) continue;
+        const base = smoothAt(cx) - 20;                // foot sits a little below the general ground level
+        const pts = M.shape.map(([dx, h]) => [SX(cx + dx), SY(base + h)]);
+        ctx.beginPath(); curve(pts); ctx.lineTo(pts[pts.length - 1][0], pxH + 10); ctx.lineTo(pts[0][0], pxH + 10); ctx.closePath();
+        ctx.fillStyle = '#000000'; ctx.fill();
+        ctx.save(); ctx.globalAlpha = D.alpha; ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = D.w; ctx.lineJoin = 'round';
+        ctx.beginPath(); curve(pts); ctx.stroke(); ctx.restore();
       }
-      if (bg.length < 2) continue;
-      ctx.beginPath(); ctx.moveTo(bg[0][0], pxH + 10);
-      for (const [x, y] of bg) ctx.lineTo(x, y);
-      ctx.lineTo(bg[bg.length - 1][0], pxH + 10); ctx.closePath();
-      ctx.fillStyle = '#000000'; ctx.fill();
-      ctx.save(); ctx.globalAlpha = L.alpha;
-      stroke(() => { bg.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); }, L.w);
-      ctx.restore();
     }
     // foreground ground (only the part on screen): black fill hides the ranges behind it
     const xL = view.x - 40, xR = view.x + pxW / view.scale + 40;
@@ -760,7 +781,12 @@ button.primary { border-width: 2.5px; }
     { let lo = 0, hi = terrain.length - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (terrain[m][0] < xR) lo = m; else hi = m; } i1 = hi; }
     const gPath = () => {
       if (xL < 0) ctx.lineTo(SX(Math.min(xL, -2000)), SY(groundAt(Math.min(xL, -2000))));
-      for (let i = i0; i <= i1; i++) ctx.lineTo(SX(terrain[i][0]), SY(terrain[i][1]));
+      // smooth curve through the ground points, except the flat landing sites which stay dead straight
+      for (let i = i0; i <= i1; i++) {
+        const [x, y] = terrain[i], n = terrain[i + 1];
+        if (!n || i === i0 || (y === n[1] && nearFlat(x, 1)) || (terrain[i - 1] && terrain[i - 1][1] === y && nearFlat(x, 1))) { ctx.lineTo(SX(x), SY(y)); continue; }
+        ctx.quadraticCurveTo(SX(x), SY(y), SX((x + n[0]) / 2), SY((y + n[1]) / 2));
+      }
       if (xR > MAP_W) ctx.lineTo(SX(Math.max(xR, MAP_W + 2000)), SY(groundAt(Math.max(xR, MAP_W + 2000))));
     };
     ctx.beginPath(); ctx.moveTo(-10, pxH + 10); gPath(); ctx.lineTo(pxW + 10, pxH + 10); ctx.closePath();
