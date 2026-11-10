@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Parabolic Target Practice</title>
+<style>
+.wrap{max-width:1400px;height:100vh;height:100dvh;margin:0 auto;padding:10px 16px 22px;display:flex;flex-direction:column;gap:10px}
+canvas{display:block;width:100%;height:100%}
+.stage-wrap{position:relative;flex:1 1 auto;min-height:220px}
+.aero-bar.top,.aero-bar.controls{font-size:16px;padding:6px 14px;flex-wrap:nowrap;gap:8px}
+.top .aero-muted{margin-right:auto;flex:0 1 auto;min-width:0;line-height:1.25}
+.aero-bar button{min-height:38px;padding:5px 14px;white-space:nowrap}
+.aero-bar .aero-chip{padding:4px 12px;white-space:nowrap}
+.aim{flex:1 1 0;display:flex;align-items:center;gap:6px;min-width:0}
+.aim label{margin-right:2px}
+.aim input[type=range]{flex:1 1 auto;min-width:60px}
+.aero-bar button.step{min-height:36px;width:36px;padding:0;font-size:20px;line-height:1}
+.controls input[type=number]{min-height:34px;padding:3px 6px;width:calc(5ch + 14px);text-align:right;-moz-appearance:textfield;appearance:textfield}
+.controls input[type=number]::-webkit-inner-spin-button,.controls input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.unit{width:.8em}
+.aim+.aim{margin-left:16px}
+#fire{min-height:48px;padding:6px 30px;font-size:18px;margin-left:16px;color:#fff;border:1px solid #8a1f17;text-shadow:0 1px 1px rgba(0,0,0,.25);
+  background:linear-gradient(180deg,#d9483b 0%,#b92f24 50%,#a8281e 51%,#b92f24 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 4px 10px rgba(120,20,15,.3)}
+#fire:hover:not(:disabled){background:linear-gradient(180deg,#e45a4c 0%,#c5372b 50%,#b22e23 51%,#c5372b 100%)}
+#fire:disabled{color:#5E7068;text-shadow:none;background:#D3DED8;border-color:#B3C4BB;box-shadow:none}
+#msg[hidden]{display:none}
+.popup{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);font-family:var(--aero-font-display);font-size:1.6rem;text-align:center;max-width:90%}
+.popup[hidden]{display:none}
+</style>
+<link rel="stylesheet" href="aerolab.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="aero-bar top">
+    <span class="aero-muted">Set a speed and angle, then press Fire.</span>
+    <span id="msg" class="aero-chip" hidden></span>
+    <span class="aero-chip">Score <span id="score">0</span></span>
+    <span class="aero-chip">Cannonballs <span id="left">10</span></span>
+    <button id="buy">Buy 1 cannonball (5 points)</button>
+    <button id="clear">Clear</button>
+    <button id="newGame">New game</button>
+  </div>
+  <div class="aero-stage stage-wrap"><canvas id="c"></canvas><div id="popup" class="aero-panel popup" role="status" hidden></div></div>
+  <div class="aero-bar controls">
+    <div class="aim">
+      <label for="speed">Speed</label>
+      <button class="step" data-for="speed" data-d="-0.1" aria-label="Speed down 0.1">−</button>
+      <input type="range" id="speed" min="0" max="100" step="0.1" value="20">
+      <button class="step" data-for="speed" data-d="0.1" aria-label="Speed up 0.1">+</button>
+      <input type="number" id="speedNum" min="0" max="100" step="0.1" value="20" aria-label="Speed value"><span class="unit"></span>
+    </div>
+    <div class="aim">
+      <label for="angle">Angle</label>
+      <button class="step" data-for="angle" data-d="-1" aria-label="Angle down 1 degree">−</button>
+      <input type="range" id="angle" min="0" max="90" step="1" value="0">
+      <button class="step" data-for="angle" data-d="1" aria-label="Angle up 1 degree">+</button>
+      <input type="number" id="angleNum" min="0" max="90" step="1" value="0" aria-label="Angle in degrees"><span class="unit">°</span>
+    </div>
+    <button id="fire" class="aero-btn-primary">Fire</button>
+  </div>
+</div>
+<script>
+// Toy planet: not to scale. Units are arbitrary.
+const R = 16000;             // planet radius
+const GM = 56 * 56 * R;      // a ball skimming the surface orbits at a speed of about 56
+const CS = 1.6;              // cannon drawing scale
+const PIVOT = 16 * CS, BARREL = 34 * CS;
+const TS = 1.3;              // target drawing scale
+const TREE = 1.3;            // tree drawing scale
+const TARGET_TOP = 28 * TS;  // target height
+const HALF = 16;             // landing this close to a target (along the ground) hits it
+const PYLON_H = 40;          // height of the bonus pylon; the ball hits it if it touches it (HALF either side, this high)
+const RISE_DELAY = 300, RISE_TIME = 1200;   // ms: the pylon waits a moment, then rises out of the ground
+const LOST = 3 * R;          // this far from the center, the ball is gone
+const BALLS = 10, PRICE = 5;
+const TAU = 2 * Math.PI;
+// Targets: [points, distance along the ground ahead of the cannon]. The last one is behind the cannon, off screen at first.
+const TARGET_DEFS = [[10, 210], [20, 510], [30, 680], [40, 1100], [1000, -320]];
+
+// The view is rotated so the planet's peak sits midway between the cannon and the 40, so the ground out to the targets looks level.
+const TILT = 560 / R;
+const viewX = (x, y) => x * Math.cos(TILT) - y * Math.sin(TILT);
+const viewY = (x, y) => x * Math.sin(TILT) + y * Math.cos(TILT);
+
+const $ = id => document.getElementById(id);
+const canvas = $('c'), ctx = canvas.getContext('2d');
+const speed = $('speed'), speedNum = $('speedNum'), angle = $('angle'), angleNum = $('angleNum');
+const msg = $('msg'), fireBtn = $('fire'), popup = $('popup');
+speed.addEventListener('input', () => { speedNum.value = speed.value; });
+speedNum.addEventListener('input', () => { speed.value = speedNum.value; });
+angle.addEventListener('input', () => { angleNum.value = angle.value; });
+angleNum.addEventListener('input', () => { angle.value = angleNum.value; });
+document.querySelectorAll('button.step').forEach(b => b.addEventListener('click', () => {
+  const range = $(b.dataset.for), num = $(b.dataset.for + 'Num');
+  const d = parseFloat(b.dataset.d), lo = parseFloat(range.min), hi = parseFloat(range.max);
+  const v = Math.max(lo, Math.min(hi, Math.round(((parseFloat(num.value) || 0) + d) * 10) / 10));
+  num.value = range.value = v;
+}));
+function aimRadians() { return Math.max(0, Math.min(90, parseFloat(angleNum.value) || 0)) * Math.PI / 180; }
+
+let W = 0, Hpx = 0, dpr = 1;
+function resize() {
+  dpr = window.devicePixelRatio || 1;
+  W = canvas.clientWidth; Hpx = canvas.clientHeight;
+  canvas.width = Math.round(W * dpr); canvas.height = Math.round(Hpx * dpr);
+}
+window.addEventListener('resize', resize); resize();
+if (window.ResizeObserver) new ResizeObserver(resize).observe(canvas);
+
+// ---------- scenery (decoration only; the ball passes in front of it) ----------
+let seed = 7;
+const rand = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+const CIRC = TAU * R;
+const keepClear = s => TARGET_DEFS.some(([, ts]) => Math.abs(((s - ts) % CIRC + CIRC + CIRC / 2) % CIRC - CIRC / 2) < 35) || Math.abs(s) < 60;
+const mountains = [], trees = [], tufts = [], stars = [];
+function makeMountain(s, w, h) {
+  // a jagged ridge with one to three peaks, so no two mountains look alike
+  const n = 6 + Math.floor(rand() * 4), peaks = 1 + Math.floor(rand() * 3), pts = [[-w / 2, 8]];
+  const centers = Array.from({ length: peaks }, () => (rand() - 0.5) * w * 0.6);
+  for (let i = 1; i < n; i++) {
+    const x = -w / 2 + w * i / n + (rand() - 0.5) * w / n * 0.6;
+    let e = 0; centers.forEach((c, j) => { e = Math.max(e, (j === 0 ? 1 : 0.55 + rand() * 0.3) * Math.max(0, 1 - Math.abs(x - c) / (w * 0.42))); });
+    pts.push([x, -h * e * (0.8 + rand() * 0.25)]);
+  }
+  pts.push([w / 2, 8]);
+  const top = Math.min(...pts.map(p => p[1]));
+  return { s, pts, top, tone: rand() };
+}
+[[-870, 300, 95], [-200, 200, 55], [590, 360, 110], [1370, 240, 70]].forEach(([s, w, h]) => mountains.push(makeMountain(s, w, h)));
+for (let s = 2600; s < CIRC - 2000; s += 2200 + rand() * 1500) mountains.push(makeMountain(s, 200 + rand() * 200, 50 + rand() * 60));
+for (let s = 0; s < CIRC; s += 45 + rand() * 90) { if (!keepClear(s)) trees.push({ s, h: 30 + rand() * 26, w: 0.38 + rand() * 0.12 }); }
+for (let s = 0; s < CIRC; s += 18 + rand() * 30) tufts.push({ s, depth: 25 + rand() * 150, size: 0.7 + rand() * 0.7 });
+for (let i = 0; i < 110; i++) stars.push([rand(), rand(), rand() * 0.5 + 0.2]);
+
+// ---------- game state ----------
+let ball = null, oldTrails = [], targets = [], score = 0, left = BALLS, nextIdx = 0;
+let revealed = false, busy = false, timers = [];
+
+const SKY = 400;        // the opening view always shows at least this much height above the ground (room for the 45° shot to the 40)
+function startBox() {   // opening view: ground fills the bottom third of the stage
+  const x0 = revealed ? -1050 : -700, x1 = 700;
+  const s = Math.min(W / (x1 - x0), (2 * Hpx / 3) / SKY), cx = (x0 + x1) / 2;
+  return [cx - W / 2 / s, R - (Hpx / 3) / s, cx + W / 2 / s, R + (2 * Hpx / 3) / s];
+}
+function fit(box) {
+  const bw = box[2] - box[0], bh = box[3] - box[1];
+  return { x: (box[0] + box[2]) / 2, y: (box[1] + box[3]) / 2, s: Math.min(W / bw, Hpx / bh) };
+}
+let cam = fit(startBox());
+
+function showMsg(text, warn) { msg.textContent = text; msg.hidden = false; msg.classList.toggle('aero-chip-warn', !!warn); }
+function refresh() {
+  $('score').textContent = score; $('left').textContent = left;
+  fireBtn.disabled = busy || (ball && !ball.done) || left === 0 || nextIdx === targets.length;
+}
+function newGame() {
+  timers.forEach(clearTimeout); timers = []; popup.hidden = true;
+  targets = TARGET_DEFS.map(([pts, s], i) => ({ pts, s, phi: ((s / R) % TAU + TAU) % TAU, hit: false, hidden: i === TARGET_DEFS.length - 1, rise: 0, riseAt: 0 }));
+  score = 0; left = BALLS; nextIdx = 0; ball = null; oldTrails = []; msg.hidden = true;
+  revealed = false; busy = false; cam = fit(startBox()); refresh();
+}
+function later(ms, fn) { timers.push(setTimeout(fn, ms)); }
+function showPopup(text, ms, then) { popup.textContent = text; popup.hidden = false; later(ms, () => { popup.hidden = true; if (then) then(); }); }
+function surprise() {   // after the 40-point target
+  busy = true; refresh();
+  showPopup('Congratulations! You hit all the targets!', 2000, () => {
+    revealed = true; const pylon = targets[targets.length - 1]; pylon.hidden = false; pylon.riseAt = performance.now() + RISE_DELAY;
+    if (ball) ball.box = null;   // let the camera pull back to the opening view, now wider
+    later(1600, () => showPopup('Oh wait, no you didn’t.', 2000, () => { busy = false; refresh(); }));
+  });
+}
+
+function fire() {
+  if (fireBtn.disabled) return;
+  if (ball && ball.trail.length > 1) oldTrails.push(ball.trail);
+  if (oldTrails.length > 8) oldTrails.shift();
+  const v = Math.max(0, Math.min(100, parseFloat(speedNum.value) || 0));
+  const a = aimRadians();
+  const x0 = BARREL * Math.cos(a), y0 = R + PIVOT + BARREL * Math.sin(a);   // muzzle tip
+  const start = Math.atan2(y0, x0);
+  ball = { x: x0, y: y0, vx: v * Math.cos(a), vy: v * Math.sin(a), done: false, prevAngle: start,
+           around: Math.PI / 2 - start,   // clockwise angle from the cannon, unwrapped
+           trail: [[x0, y0]], box: [viewX(x0, y0), viewY(x0, y0), viewX(x0, y0), viewY(x0, y0)] };
+  left--; msg.hidden = true; cam = fit(startBox()); refresh();
+}
+function endShot(text, warn) {
+  ball.done = true;
+  if (nextIdx === targets.length) text = 'All targets hit!';
+  else if (left === 0) text += ' · Out of cannonballs';
+  showMsg(text, warn); refresh();
+}
+function strike(t) {
+  const i = targets.indexOf(t);
+  if (i === nextIdx) {
+    t.hit = true; nextIdx++; score += t.pts; endShot('+' + t.pts);
+    if (i === targets.length - 2) surprise();
+  } else endShot('Out of order', true);
+}
+fireBtn.addEventListener('click', fire);
+$('buy').addEventListener('click', () => { score -= PRICE; left++; if (!busy && (!ball || ball.done) && nextIdx < targets.length) msg.hidden = true; refresh(); });
+$('clear').addEventListener('click', () => { oldTrails = []; if (ball) ball.trail = [[ball.x, ball.y]]; });
+$('newGame').addEventListener('click', newGame);
+
+function accel(x, y) { const r = Math.hypot(x, y), k = -GM / (r * r * r); return [k * x, k * y]; }
+function rk4(b, h) {
+  const f = (x, y, vx, vy) => { const a = accel(x, y); return [vx, vy, a[0], a[1]]; };
+  const k1 = f(b.x, b.y, b.vx, b.vy);
+  const k2 = f(b.x + k1[0] * h / 2, b.y + k1[1] * h / 2, b.vx + k1[2] * h / 2, b.vy + k1[3] * h / 2);
+  const k3 = f(b.x + k2[0] * h / 2, b.y + k2[1] * h / 2, b.vx + k2[2] * h / 2, b.vy + k2[3] * h / 2);
+  const k4 = f(b.x + k3[0] * h, b.y + k3[1] * h, b.vx + k3[2] * h, b.vy + k3[3] * h);
+  b.x += h / 6 * (k1[0] + 2 * k2[0] + 2 * k3[0] + k4[0]);
+  b.y += h / 6 * (k1[1] + 2 * k2[1] + 2 * k3[1] + k4[1]);
+  b.vx += h / 6 * (k1[2] + 2 * k2[2] + 2 * k3[2] + k4[2]);
+  b.vy += h / 6 * (k1[3] + 2 * k2[3] + 2 * k3[3] + k4[3]);
+}
+
+function update(realDt) {
+  if (!ball || ball.done) return;
+  const viewSize = Math.max(W, Hpx) / cam.s;
+  let simTime = Math.min(realDt, 0.05) * viewSize / 60;   // faster when zoomed out
+  const h = 0.04;
+  const live = targets.filter(t => !t.hit && !t.hidden);
+  while (simTime > 0 && !ball.done) {
+    const step = Math.min(h, simTime); simTime -= step;
+    rk4(ball, step);
+    const ang = Math.atan2(ball.y, ball.x);
+    let d = ang - ball.prevAngle;
+    if (d > Math.PI) d -= TAU; if (d < -Math.PI) d += TAU;
+    const before = ball.around;
+    ball.around -= d; ball.prevAngle = ang;
+    const lo = Math.min(before, ball.around), hi = Math.max(before, ball.around);
+    const alt = Math.hypot(ball.x, ball.y) - R;
+    const here = ((ball.around % TAU) + TAU) % TAU;
+    const gap = t => Math.min(Math.abs(here - t.phi), TAU - Math.abs(here - t.phi)) * R;   // ground distance to a target
+    // The bonus pylon stands up from the ground, so a ball sailing past it sideways (or landing on it) touches it.
+    const pylon = live.find(t => t.pts === 1000);
+    if (pylon && alt <= PYLON_H * pylon.rise && gap(pylon) <= HALF) { strike(pylon); break; }
+    if (alt <= 0) {
+      const t = live.find(t => gap(t) <= HALF);
+      if (t) strike(t); else endShot('Landed');
+      break;
+    }
+    if (Math.abs(ball.around) > 3 * TAU) { endShot('In orbit'); break; }
+    if (alt + R > LOST) { endShot('Lost in space', true); break; }
+    if (!revealed) {   // until the bonus target appears, the view is fixed and the ball stops at the screen edge
+      const sx = X(ball.x, ball.y), sy = Y(ball.x, ball.y);
+      if (sx < 0 || sx > W || sy < 0 || sy > Hpx) { endShot('Off screen'); break; }
+    }
+  }
+  const last = ball.trail[ball.trail.length - 1];
+  if (Math.hypot(ball.x - last[0], ball.y - last[1]) * cam.s > 2) ball.trail.push([ball.x, ball.y]);
+  if (ball.box) {
+    const b = ball.box, vx = viewX(ball.x, ball.y), vy = viewY(ball.x, ball.y);
+    b[0] = Math.min(b[0], vx); b[1] = Math.min(b[1], vy);
+    b[2] = Math.max(b[2], vx); b[3] = Math.max(b[3], vy);
+  }
+}
+
+function updateCamera() {
+  let box = startBox();
+  if (ball && ball.box && revealed) {
+    const b = ball.box, pad = 0.12 * Math.max(b[2] - b[0], b[3] - b[1]);
+    box = [Math.min(box[0], b[0] - pad), Math.min(box[1], b[1] - pad),
+           Math.max(box[2], b[2] + pad), Math.max(box[3], b[3] + pad)];
+  }
+  const t = fit(box), k = 0.07;
+  cam.x += (t.x - cam.x) * k; cam.y += (t.y - cam.y) * k;
+  cam.s *= Math.pow(t.s / cam.s, k);
+}
+const X = (x, y) => W / 2 + (viewX(x, y) - cam.x) * cam.s;
+const Y = (x, y) => Hpx / 2 - (viewY(x, y) - cam.y) * cam.s;
+
+// Move the drawing origin to a spot on the ground `s` ahead of the cannon (and `depth` below the surface), "up" pointing outward.
+function atGround(s, depth, scale) {
+  const th = Math.PI / 2 - s / R, r = R - (depth || 0), x = r * Math.cos(th), y = r * Math.sin(th);
+  const sx = X(x, y), sy = Y(x, y);
+  ctx.translate(sx, sy); ctx.rotate(-(th - Math.PI / 2) - TILT); ctx.scale(scale, scale);
+  return [sx, sy];
+}
+const onScreen = (s, depth, pad) => {
+  const th = Math.PI / 2 - s / R, r = R - (depth || 0), sx = X(r * Math.cos(th), r * Math.sin(th)), sy = Y(r * Math.cos(th), r * Math.sin(th));
+  return sx > -pad && sx < W + pad && sy > -pad && sy < Hpx + pad;
+};
+
+function drawMountains() {
+  const s0 = cam.s;
+  if (s0 * 60 < 2) return;
+  mountains.forEach(m => {
+    if (!onScreen(m.s, 0, 450 * s0)) return;
+    ctx.save(); atGround(m.s, 0, s0);
+    ctx.beginPath(); m.pts.forEach(([x, y]) => ctx.lineTo(x, y)); ctx.closePath();
+    ctx.fillStyle = m.tone > 0.5 ? '#7E97A3' : '#6C8692'; ctx.fill();
+    if (m.top < -70) {   // snow on the taller peaks
+      ctx.clip(); ctx.fillStyle = '#F2F6F4'; ctx.fillRect(-1000, m.top - 10, 2000, (-m.top) * 0.2 + 10);
+    }
+    ctx.restore();
+  });
+}
+function drawTrees() {
+  const s0 = cam.s;
+  if (s0 * 40 < 3) return;
+  trees.forEach(t => {
+    if (!onScreen(t.s, 0, 80 * s0)) return;
+    // Trees stand straight up on the screen instead of leaning with the curve, so the ground looks flat.
+    const th = Math.PI / 2 - t.s / R;
+    ctx.save(); ctx.translate(X(R * Math.cos(th), R * Math.sin(th)), Y(R * Math.cos(th), R * Math.sin(th))); ctx.scale(s0 * TREE, s0 * TREE);
+    ctx.fillStyle = '#5b4030'; ctx.fillRect(-2, -8, 4, 9);
+    ctx.fillStyle = '#0F3322';
+    for (let i = 0; i < 3; i++) {
+      const y = -8 - i * t.h * 0.27, w = t.h * t.w * (1 - i * 0.25);
+      ctx.beginPath(); ctx.moveTo(-w, y); ctx.lineTo(0, y - t.h * 0.45); ctx.lineTo(w, y); ctx.fill();
+    }
+    ctx.restore();
+  });
+}
+function drawTufts() {
+  const s0 = cam.s;
+  if (s0 < 0.35) return;
+  ctx.strokeStyle = '#1F5A3B'; ctx.lineCap = 'round';
+  tufts.forEach(t => {
+    if (!onScreen(t.s, t.depth, 40)) return;
+    ctx.save(); atGround(t.s, t.depth, s0 * t.size);
+    ctx.lineWidth = 1.8;
+    [[-6, -9], [-3, -14], [0, -17], [3, -13], [6, -8]].forEach(([dx, dy]) => {
+      ctx.beginPath(); ctx.moveTo(dx * 0.4, 0); ctx.quadraticCurveTo(dx * 0.6, dy * 0.6, dx, dy); ctx.stroke(); });
+    ctx.restore();
+  });
+}
+
+function drawCannon(k) {
+  const P = 16, B = 34;   // drawn at CS times this size; matches PIVOT and BARREL
+  ctx.save();
+  ctx.translate(X(0, R), Y(0, R));
+  ctx.rotate(-TILT);
+  ctx.scale(k * CS, k * CS);
+  ctx.lineJoin = 'round'; ctx.strokeStyle = '#F2F6F4'; ctx.lineWidth = 0.45;
+  ctx.fillStyle = '#8A5A32';
+  ctx.beginPath(); ctx.moveTo(-34, 0); ctx.lineTo(6, 0); ctx.lineTo(4, -P); ctx.lineTo(-6, -P - 2); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.save();
+  ctx.translate(0, -P);
+  ctx.rotate(-aimRadians());
+  ctx.fillStyle = '#15191A';
+  ctx.beginPath(); ctx.arc(-22, 0, 2.8, 0, 7); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(-15, 0, 6.5, 0, 7); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-14, -6.5); ctx.lineTo(B, -4.5); ctx.lineTo(B, 4.5); ctx.lineTo(-14, 6.5); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillRect(B - 3, -5.8, 3, 11.6); ctx.strokeRect(B - 3, -5.8, 3, 11.6);
+  ctx.restore();
+  ctx.fillStyle = '#A06A3A';
+  ctx.beginPath(); ctx.arc(-3, -11, 11, 0, 7); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = '#F2D9A8'; ctx.lineWidth = 1.4;
+  for (let i = 0; i < 6; i++) { const t = i * Math.PI / 3; ctx.beginPath(); ctx.moveTo(-3, -11); ctx.lineTo(-3 + 10 * Math.cos(t), -11 + 10 * Math.sin(t)); ctx.stroke(); }
+  ctx.fillStyle = '#F2D9A8'; ctx.beginPath(); ctx.arc(-3, -11, 2.6, 0, 7); ctx.fill();
+  ctx.restore();
+}
+function drawPylon(t) {
+  // Red-and-white striped post that rises out of the ground; the part below the ground line is clipped away.
+  const hw = Math.max(HALF * cam.s, 5), full = Math.max(PYLON_H * cam.s, 14), up = full * t.rise;
+  ctx.save();
+  atGround(t.s, 0, 1);
+  ctx.globalAlpha = t.hit ? 0.35 : 1;
+  ctx.beginPath(); ctx.rect(-2000, -4000, 4000, 4000); ctx.clip();   // everything above the ground line
+  const bands = 5, bh = full / bands;
+  for (let i = 0; i < bands; i++) {
+    ctx.fillStyle = i % 2 === 0 ? '#d23c2e' : '#ffffff';
+    ctx.fillRect(-hw, -full + i * bh + (full - up), hw * 2, bh + 0.5);
+  }
+  ctx.strokeStyle = '#F2F6F4'; ctx.lineWidth = 1; ctx.strokeRect(-hw, -up, hw * 2, up);
+  ctx.restore();
+  if (!t.hit && t.rise > 0.02) {   // points tag above the post, riding up with it
+    ctx.save(); atGround(t.s, 0, 1);
+    const label = String(t.pts);
+    ctx.font = '600 12px Lexend, system-ui, sans-serif';
+    const tw = ctx.measureText(label).width + 8, ty = -up - 24;
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.roundRect(-tw / 2, ty, tw, 16, 4); ctx.fill();
+    ctx.fillStyle = '#12291F'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(label, 0, ty + 8);
+    ctx.restore();
+  }
+}
+function drawTarget(t, k) {
+  if (t.hidden) return;
+  if (t.pts === 1000) { drawPylon(t); return; }
+  ctx.save();
+  atGround(t.s, 0, 1);
+  const sc = Math.max(cam.s, 0.6 * k / Math.max(k, 1e-9));
+  const w = HALF * cam.s, hgt = Math.max(2.5, 3.5 * k);   // flat mark, as wide as the landing zone
+  ctx.globalAlpha = t.hit ? 0.35 : 1;
+  const rings = ['#d23c2e', '#ffffff', '#d23c2e', '#ffffff', '#d23c2e'];
+  rings.forEach((c, i) => { const f = 1 - i * 0.2; ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(0, 0, Math.max(w, 6) * f, hgt * f, 0, 0, 7); ctx.fill(); });
+  if (!t.hit) {   // points tag above the mark
+    const label = String(t.pts);
+    ctx.font = '600 12px Lexend, system-ui, sans-serif';
+    const tw = ctx.measureText(label).width + 8;
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.roundRect(-tw / 2, -26, tw, 16, 4); ctx.fill();
+    ctx.fillStyle = '#12291F'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(label, 0, -18);
+  }
+  ctx.restore();
+}
+
+function draw() {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, W, Hpx);
+  stars.forEach(s => { ctx.fillStyle = 'rgba(238,245,241,' + s[2] + ')'; ctx.fillRect(s[0] * W, s[1] * Hpx, 1.5, 1.5); });
+  drawMountains();
+  const ex = X(0, 0), ey = Y(0, 0), er = R * cam.s;
+  const g = ctx.createRadialGradient(ex - er * .35, ey - er * .35, er * .1, ex, ey, er);
+  g.addColorStop(0, '#7CC49A'); g.addColorStop(1, '#2F7A52');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(ex, ey, er, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#E3F3E9'; ctx.lineWidth = 2; ctx.stroke();
+  drawTrees();
+
+  const k = Math.max(cam.s, 0.6);
+  targets.forEach(t => drawTarget(t, k));
+  ctx.lineWidth = 2; ctx.lineJoin = 'round';
+  ctx.strokeStyle = 'rgba(224,180,60,.35)';
+  oldTrails.forEach(t => { ctx.beginPath(); t.forEach(p => ctx.lineTo(X(p[0], p[1]), Y(p[0], p[1]))); ctx.stroke(); });
+  if (ball) {
+    ctx.strokeStyle = '#E0B43C'; ctx.lineWidth = 2.5; ctx.beginPath();
+    ball.trail.forEach(p => ctx.lineTo(X(p[0], p[1]), Y(p[0], p[1]))); ctx.lineTo(X(ball.x, ball.y), Y(ball.x, ball.y)); ctx.stroke();
+  }
+  drawCannon(k);
+  if (ball) { ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(X(ball.x, ball.y), Y(ball.x, ball.y), Math.max(3.5, 4 * k), 0, 7); ctx.fill(); }
+  drawTufts();
+}
+
+newGame();
+let lastTime = performance.now();
+function loop(now) {
+  const dt = (now - lastTime) / 1000; lastTime = now;
+  const pylon = targets[targets.length - 1];
+  if (pylon && !pylon.hidden && pylon.rise < 1) {   // ease-out rise
+    const f = Math.max(0, Math.min(1, (performance.now() - pylon.riseAt) / RISE_TIME));
+    pylon.rise = 1 - Math.pow(1 - f, 3);
+  }
+  update(dt); updateCamera(); draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
