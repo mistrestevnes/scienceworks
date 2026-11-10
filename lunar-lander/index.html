@@ -86,6 +86,28 @@ button.primary { border-width: 2.5px; }
 .fuelbox .bar { width: 160px; height: 14px; border: 1.5px solid var(--line); padding: 2px; }
 .fuelbox .bar i { display: block; height: 100%; background: var(--line); }
 .fuelbox #rF { min-width: 4ch; text-align: right; font-variant-numeric: tabular-nums; }
+.hullbox {
+  position: absolute; top: 58px; left: 14px; border: 1.5px solid var(--line); background: var(--bg);
+  padding: 6px 12px; font-size: 15px; display: grid; gap: 4px;
+}
+.hullbox .top { display: flex; align-items: center; gap: 10px; }
+.hullbox .bar { width: 160px; height: 14px; border: 1.5px solid var(--line); padding: 2px; }
+.hullbox .bar i { display: block; height: 100%; background: var(--line); }
+.hullbox #rHull { min-width: 5ch; text-align: right; font-variant-numeric: tabular-nums; }
+.hullbox #faults { display: grid; gap: 2px; font-variant-numeric: tabular-nums; white-space: pre; }
+.hullbox #faults:empty { display: none; }
+.timebox {
+  position: absolute; top: 58px; right: 14px; border: 1.5px solid var(--line); background: var(--bg);
+  padding: 4px 12px; font-size: 22px; font-variant-numeric: tabular-nums; display: flex; gap: 10px; align-items: baseline;
+}
+.timebox .lbl { font-size: 15px; }
+.heatbox {
+  position: absolute; top: 106px; right: 14px; display: flex; align-items: center; gap: 10px;
+  border: 1.5px solid var(--line); background: var(--bg); padding: 6px 12px; font-size: 15px;
+}
+.heatbox .bar { width: 120px; height: 14px; border: 1.5px solid var(--line); padding: 2px; }
+.heatbox .bar i { display: block; height: 100%; background: var(--line); }
+.heatbox #rHeat { min-width: 4ch; text-align: right; font-variant-numeric: tabular-nums; }
 .altbig {
   position: absolute; right: 56px; bottom: 46px; text-align: right; pointer-events: none;
   font-variant-numeric: tabular-nums; line-height: 1.05;
@@ -97,7 +119,7 @@ button.primary { border-width: 2.5px; }
   border: 1.5px solid var(--line); background: var(--bg);
 }
 .fbd {
-  position: absolute; top: 62px; left: 14px; border: 1.5px solid var(--line); background: var(--bg);
+  position: absolute; top: 108px; left: 14px; border: 1.5px solid var(--line); background: var(--bg);
   padding: 8px 12px; display: grid; gap: 4px; font-size: 14px; font-variant-numeric: tabular-nums;
 }
 .fbd canvas { width: 170px; height: 230px; display: block; justify-self: center; }
@@ -133,9 +155,15 @@ button.primary { border-width: 2.5px; }
 
     <div class="toast" id="toast" hidden></div>
     <div class="fuelbox" aria-label="Fuel"><span>Fuel</span><div class="bar"><i id="fuelFill" style="width:100%"></i></div><span id="rF">100%</span></div>
+    <div class="hullbox" id="hullBox" aria-label="Hull">
+      <div class="top"><span>Hull</span><div class="bar"><i id="hullFill" style="width:100%"></i></div><span id="rHull">60/60</span></div>
+      <div id="faults"></div>
+    </div>
     <canvas class="minimap" id="minimap" width="980" height="180" hidden aria-label="Terrain ahead (minimap)"></canvas>
     <div class="altbig" id="altBig" hidden aria-label="Altitude"><div class="lbl">Altitude</div><div class="num" id="rH">0.0 m</div></div>
     <div class="powerbar" aria-label="Engine"><span>Engine</span><span id="rPow">OFF</span><div class="bar"><i id="pwFill" style="width:50%"></i></div><span id="rThr">50%</span></div>
+    <div class="timebox" id="timeBox" aria-label="Mission time"><span class="lbl">Mission time</span><span id="rTime">0:00</span></div>
+    <div class="heatbox" id="heatWrap" hidden aria-label="Engine heat"><span>Engine heat</span><div class="bar"><i id="heatFill" style="width:0%"></i></div><span id="rHeat">0%</span></div>
     <div class="nav" aria-label="Next team">
       <canvas id="navArrow" width="144" height="144" aria-hidden="true"></canvas>
       <div class="big" id="rNext">–</div>
@@ -190,9 +218,17 @@ button.primary { border-width: 2.5px; }
   const MAX_THRUST = 94000;       // N, the one engine at 100% throttle
   const START_THROTTLE = 0.5;
   const FULL_BURN_S = 360;        // seconds a full tank lasts at 100% throttle on the Moon
-  const ROT_RATE = 63;            // degrees per second while an arrow key is held (30% slower than the old 90)
+  const ROT_RATE = 50.4;          // degrees per second while an arrow key is held; the faster-turning upgrade gives 63
   const MAX_TILT = 10;            // degrees from upright allowed at touchdown
-  const SAFE_VY = 2.5, SAFE_VX = 2.0;
+  // touchdown: up to 2.0 m/s (down or sideways) is clean; every full 0.1 m/s over that does 1 damage, so damage
+  // starts at 2.1 m/s (down and sideways counted separately and added); over 6.0 m/s either way also snaps a leg
+  const SAFE_V0 = 2.0, SNAP_V = 6.0;   // the shock-absorber upgrade raises the clean limit to 2.5 m/s
+  const HULL_MAX = 60, LEG_LOSS_AT = 30;   // hull points (hull plating adds 20); a leg also breaks once 30 damage has built up
+  // ---------- upgrades: the minimap from the first team picked up, then one random upgrade from each later team
+  const UPGRADES = {
+    path: 'trajectory path', turning: 'faster turning (+25%)', economy: 'better fuel economy (20% less fuel)',
+    shocks: 'shock absorbers (clean landings up to 2.5 m/s)', plating: 'hull plating (+20 hull, 10 repaired)'
+  };
   const ZOOM_IN_ALT = 40, ZOOM_OUT_ALT = 50;   // below 40 m above the surface: close view (landing view when descending); out above 50 m
   const CLOSE_H = 120;            // metres shown top to bottom in the close view
   const FAR_H = 600;              // metres shown top to bottom in the far view
@@ -220,8 +256,8 @@ button.primary { border-width: 2.5px; }
   }
 
   // ---------- map: 24 km, fixed; a mountain of varied height (170-480 m) between each pair of sites ----------
-  const MAP_W = 24000;
-  const BASE = { x1: 900, x2: 1020, y: 200, base: true };
+  let MAP_W = 24000;   // shortened below when the stops are moved closer together
+  const BASE = { x1: 240, x2: 360, y: 200, base: true };   // moved left so the first shelter starts off the minimap
   const SITES = [
     { name: 'Plateau',  x1: 3660, x2: 3810, y: 420, side: 'left'  },
     { name: 'Ravine',   x1: 6990, x2: 7140, y: 30,  side: 'right' },
@@ -229,11 +265,30 @@ button.primary { border-width: 2.5px; }
     { name: 'Ledge',    x1: 14700, x2: 14850, y: 380, side: 'right' },
     { name: 'Crater',   x1: 19740, x2: 19890, y: 120, side: 'left'  }
   ];
-  for (const t of SITES) t.shelterX = t.side === 'left' ? t.x1 + 5 : t.x2 - 5;
 
   const CONTROL = [
-    [0,  270], [900,  200], [1020,  200], [1541,  234], [1788,  502], [2162,  801], [2247,  830], [2353,  787], [2671,  590], [2953,  350], [3660,  420], [3810,  420], [4680,  470], [4996,  430], [5171,  534], [5436,  647], [5496,  660], [5571,  640], [5796,  488], [5996,  316], [6150,  300], [6600,  250], [6810,  130], [6990,  30], [7140,  30], [7590,  150], [7830,  280], [8198,  311], [8445,  602], [8820,  930], [8905,  958], [9011,  916], [9329,  728], [9612,  498], [10140,  620], [10620,  760], [10770,  760], [11280,  700], [11789,  539], [11999,  679], [12316,  831], [12388,  849], [12477,  821], [12747,  612], [12986,  374], [13500,  340], [14250,  290], [14700,  380], [14850,  380], [15256,  540], [15390,  660], [16050,  600], [16362,  551], [16530,  628], [16785,  711], [16843,  721], [16915,  706], [17131,  569], [17323,  417], [18000,  340], [18900,  280], [19320,  330], [19560,  220], [19740,  120], [19890,  120], [20370,  230], [20640,  330], [21300,  290], [22350,  230], [23250,  180], [24000,  230]
+    [0,  270], [240,  200], [360,  200], [1541,  234], [1788,  502], [2162,  801], [2247,  830], [2353,  787], [2671,  590], [2953,  350], [3660,  420], [3810,  420], [4680,  470], [4996,  430], [5171,  534], [5436,  647], [5496,  660], [5571,  640], [5796,  488], [5996,  316], [6150,  300], [6600,  250], [6810,  130], [6990,  30], [7140,  30], [7590,  150], [7830,  280], [8198,  311], [8445,  602], [8820,  930], [8905,  958], [9011,  916], [9329,  728], [9612,  498], [10140,  620], [10620,  760], [10770,  760], [11280,  700], [11789,  539], [11999,  679], [12316,  831], [12388,  849], [12477,  821], [12747,  612], [12986,  374], [13500,  340], [14250,  290], [14700,  380], [14850,  380], [15256,  540], [15390,  660], [16050,  600], [16362,  551], [16530,  628], [16785,  711], [16843,  721], [16915,  706], [17131,  569], [17323,  417], [18000,  340], [18900,  280], [19320,  330], [19560,  220], [19740,  120], [19890,  120], [20370,  230], [20640,  330], [21300,  290], [22350,  230], [23250,  180], [24000,  230]
   ];
+  // Stops 10% closer together: the distance between the centres of each pair of neighbouring stops (base
+  // included) shrinks by 10%. Only the ground between them is squeezed; each landing site stays 150 m wide and
+  // the stretch past the last shelter keeps its length. Heights are unchanged.
+  {
+    const flats = [BASE, ...SITES], oldK = [0], newK = [0];
+    let shift = 0;
+    flats.forEach((f, i) => {
+      if (i > 0) { const p = flats[i - 1]; shift += 0.1 * (((f.x1 + f.x2) - (p.x1 + p.x2)) / 2); }
+      oldK.push(f.x1, f.x2); newK.push(f.x1 - shift, f.x2 - shift);
+    });
+    oldK.push(MAP_W); newK.push(MAP_W - shift);
+    const remap = x => {
+      for (let i = 0; i < oldK.length - 1; i++) if (x <= oldK[i + 1]) return newK[i] + (x - oldK[i]) * (newK[i + 1] - newK[i]) / (oldK[i + 1] - oldK[i]);
+      return x - shift;
+    };
+    for (const c of CONTROL) c[0] = Math.round(remap(c[0]) * 10) / 10;
+    for (const f of flats) { f.x1 = Math.round(remap(f.x1) * 10) / 10; f.x2 = Math.round(remap(f.x2) * 10) / 10; }
+    MAP_W = Math.round(MAP_W - shift);
+  }
+  for (const t of SITES) t.shelterX = t.side === 'left' ? t.x1 + 5 : t.x2 - 5;
   const FLATS = [BASE, ...SITES];
   const isFlat = (a, b) => FLATS.some(f => f.x1 === a[0] && f.x2 === b[0]);
 
@@ -339,9 +394,13 @@ button.primary { border-width: 2.5px; }
     { p: 0.25, alpha: 0.35, w: 0.6,  hMin: 50, hMax: 130, gap: [450, 900] },
     { p: 0.5,  alpha: 0.6,  w: 0.75, hMin: 25, hMax: 75,  gap: [300, 650] }
   ];
+  // The background mountains (and the stars after them) use their own fixed starting point in the random
+  // sequence, and are generated over the original 24 km length, so changes to the ground never reshuffle them.
+  // This starting point reproduces the version 76 background exactly.
+  seed = 1825234981;
   for (const D of BG_DEPTHS) {
     D.m = [];
-    for (let x = -2500; x < MAP_W * D.p + 4000; x += D.gap[0] + rnd() * (D.gap[1] - D.gap[0])) {
+    for (let x = -2500; x < 24000 * D.p + 4000; x += D.gap[0] + rnd() * (D.gap[1] - D.gap[0])) {
       // varied sizes: about one in five is a big one (up to twice the usual height), and the width-to-height
       // ratio varies from steep peaks to broad, low massifs
       const big = rnd() < 0.2 ? 1.5 + rnd() * 0.5 : 1;
@@ -425,7 +484,10 @@ button.primary { border-width: 2.5px; }
     game = {
       mode, practiceIdx, state: 'landed', paused: false, time: 0, fuel: 100, main: false,
       throttle: START_THROTTLE, score: 0, tally: { safe: 0, injured: 0, killed: 0 }, picked: new Set(),
-      log: [], logT: 0, wHeld: false, cp: null
+      log: [], logT: 0, wHeld: false, cp: null,
+      hull: HULL_MAX, hullMax: HULL_MAX, dmgTotal: 0, upg: new Set(), legGone: 0,   // legGone: -1 left front leg broken, +1 right, 0 none
+      faults: { handling: 0, fuel: 0, misfire: 0, life: 0, coolant: 0 }, lifeLeft: null,
+      heat: 0, overheat: false, misfireT: 0, topple: null
     };
     if (mode === 'practice') {
       const t = SITES[practiceIdx];
@@ -466,7 +528,7 @@ button.primary { border-width: 2.5px; }
     $('overlay').hidden = false;
   }
   function refreshGoal() {
-    $('ovGoal').textContent = 'Pick up all five teams, then land back at base. Land on the flat ground beside each shelter, upright to within 10°, with y velocity under 2.5 m/s and x velocity under 2.0 m/s. Landing closer than 30 m to a shelter hurts the people inside.';
+    $('ovGoal').textContent = 'Pick up all five teams, then land back at base. Land on the flat ground beside each shelter, upright to within 10°. Touching down faster than 2 m/s, down or sideways, damages the ship, and faster than 6 m/s breaks a leg. Landing closer than 30 m to a shelter hurts the people inside.';
     $('ovHover').hidden = !settings.edu || game.state !== 'intro';
     $('ovHover').textContent = `Before you fly: what throttle setting will make the ship hover? Hovering means thrust equals weight. The engine gives ${fmtN(MAX_THRUST)} at 100%, the ship's mass is ${fmt(MASS)} kg, and gravity on ${settings.world === 'Moon' ? 'the Moon' : settings.world} is ${WORLDS[settings.world]} m/s/s.`;
   }
@@ -503,17 +565,98 @@ button.primary { border-width: 2.5px; }
     return [st.x + lx * Math.cos(r) + ly * Math.sin(r), st.y - lx * Math.sin(r) + ly * Math.cos(r)];
   }
 
+  const SAFE = () => game.upg.has('shocks') ? 2.5 : SAFE_V0;
+  function giveUpgrade() {   // called when a team is picked up; returns the message
+    if (!game.upg.has('minimap')) { game.upg.add('minimap'); return 'Upgrade: minimap.'; }
+    const open = Object.keys(UPGRADES).filter(k => !game.upg.has(k));
+    if (!open.length) return '';
+    const k = open[Math.floor(Math.random() * open.length)];
+    game.upg.add(k);
+    if (k === 'plating') { game.hullMax += 20; game.hull = Math.min(game.hullMax, game.hull + 30); }
+    return 'Upgrade: ' + UPGRADES[k] + '.';
+  }
+  const feetNow = () => SHIP.feet.filter(f => Math.sign(f[0]) !== game.legGone);
+  // place the ship at a given tilt with one foot (local point pf) fixed at world point F
+  function setPose(F, pf, rot) {
+    const r = rot * Math.PI / 180, c = Math.cos(r), sn = Math.sin(r);
+    s.rot = rot; s.x = F[0] - (pf[0] * c + pf[1] * sn); s.y = F[1] - (-pf[0] * sn + pf[1] * c);
+  }
+  // how far a ship with a broken leg leans once it has fallen over: it pivots on the remaining front foot until
+  // the side tank on the broken side touches the ground (about 15 degrees)
+  const TOPPLE_PTS = [...SHIP.top, [-4.4, -1.1], [4.4, -1.1]];
+  const REST_TILT = (() => {
+    const pf = [LEG, -3.5];   // left leg broken: pivot on the right foot, lean left
+    for (let a = 0; a <= 60; a += 0.1) {
+      const r = -a * Math.PI / 180;
+      if (TOPPLE_PTS.some(([x, y]) => x < 0 && -(x - pf[0]) * Math.sin(r) + (y - pf[1]) * Math.cos(r) <= 0)) return a;
+    }
+    return 15;
+  })();
+  function startTopple() {
+    const side = game.legGone, pf = [-side * LEG, -3.5];
+    game.topple = { t: 0, F: toWorld(pf), pf, to: side * REST_TILT };
+  }
+  // random problems: one new problem each time the total damage passes a multiple of 20 (at 20 and 40);
+  // which problem is random, and problems do not
+  // stack (each can happen once)
+  const FAULT_NAMES = { handling: 'worse handling', fuel: 'poor fuel efficiency', misfire: 'engine misfires', life: 'life support failing', coolant: 'coolant leak' };
+  function rollFaults(dmg) {
+    const got = [], total = game.dmgTotal;   // damage so far, this landing included (repairs don't reduce it)
+    const n = Math.floor(total / 20) - Math.floor((total - dmg) / 20);
+    for (let i = 0; i < n; i++) {
+      const open = Object.keys(game.faults).filter(k => !game.faults[k]);
+      if (!open.length) break;
+      const k = open[Math.floor(Math.random() * open.length)];
+      game.faults[k]++;
+      if (k === 'life') game.lifeLeft = 600;   // 10 minutes
+      got.push(k);
+    }
+    return got;
+  }
+  // the mission is over for good (no restarting from a shelter)
+  function finalEnd(title, text) {
+    setMain(false); game.state = 'over'; game.cp = null; hideToast();
+    showEnd(title, text + ' Press Space or R to restart the mission.');
+  }
+
   function step(dt) {
     if (game.paused || (game.state !== 'flying' && game.state !== 'landed')) return;
     if ($('overlay').hidden === false) return;                 // results showing
     game.time += dt;
+    const F = game.faults;
+    // life support failing: the mission ends when it runs out
+    if (game.lifeLeft !== null) { game.lifeLeft -= dt; if (game.lifeLeft <= 0) return finalEnd('Life support failed', 'The crew ran out of air.'); }
+    // a ship with a broken leg falls over onto its side after landing (no liftoff until it has settled)
+    if (game.topple) {
+      const T = game.topple; T.t = Math.min(1, T.t + dt / 0.8);
+      setPose(T.F, T.pf, T.to * T.t * T.t);
+      s.thrusting = false; s.alt = 0;
+      if (T.t >= 1) game.topple = null;
+      return;
+    }
     if (game.fuel <= 0 && game.main) setMain(false);
-    const thrust = game.main ? game.throttle * MAX_THRUST : 0;
+    let thrust = game.main ? game.throttle * MAX_THRUST : 0;
+    // engine misfires: short random cut-outs while firing
+    if (game.misfireT > 0) game.misfireT -= dt;
+    else if (F.misfire && thrust > 0 && Math.random() < 0.12 * F.misfire * dt) game.misfireT = 0.25 + Math.random() * 0.45;
+    if (game.misfireT > 0) thrust = 0;
+    // coolant leak: the engine heats up while firing and shuts down when it overheats, until it cools
+    if (F.coolant) {
+      const limit = [0, 20, 13, 8][F.coolant];   // seconds of full-throttle firing from cold to overheated
+      if (game.overheat) thrust = 0;
+      if (thrust > 0) game.heat = Math.min(1, game.heat + game.throttle * dt / limit);
+      else game.heat = Math.max(0, game.heat - dt / (limit * 1.5));
+      if (game.heat >= 1 && !game.overheat) { game.overheat = true; toast('Engine overheated. It will restart when it has cooled.', 4000); }
+      if (game.overheat && game.heat <= 0.35) game.overheat = false;
+      if (game.overheat) thrust = 0;
+    }
     const m = shipMass();
-    game.fuel = Math.max(0, game.fuel - fuelPerN() * thrust * dt);
+    game.fuel = Math.max(0, game.fuel - fuelPerN() * thrust * dt * (1 + 0.15 * F.fuel) * (game.upg.has('economy') ? 0.8 : 1));   // poor efficiency +15%, economy upgrade -20%
 
+    stepBoarders(dt);
     if (game.state === 'landed') {
       s.thrusting = thrust > 0; s.ax = 0; s.ay = 0;
+      if (thrust / m > grav && boarding()) { if (!game.boardMsg) { game.boardMsg = true; toast('Wait: the crew is still boarding.', 3000); } return; }
       if (thrust / m > grav) { game.state = 'flying'; s.y += 0.05; game.log = []; game.liftLock = true; game.launching = true; }
       else { if (game.fuel <= 0 && game.mode === 'mission') outOfFuel(); return; }
     }
@@ -521,8 +664,11 @@ button.primary { border-width: 2.5px; }
     // after liftoff the ship stays upright until its feet are 5 m clear of the ground
     if (game.liftLock && s.alt >= 5) game.liftLock = false;
     if (game.launching && s.vy < 0) game.launching = false;   // launching ends once the ship starts coming down
-    if (!game.liftLock && keys.has('ArrowLeft'))  s.rot = Math.max(-90, s.rot - ROT_RATE * dt);
-    if (!game.liftLock && keys.has('ArrowRight')) s.rot = Math.min(90,  s.rot + ROT_RATE * dt);
+    // worse handling: slower turning (20% less per level) and a slow wandering drift
+    const rr = (game.upg.has('turning') ? 63 : ROT_RATE) * Math.max(0.4, 1 - 0.2 * F.handling);
+    if (!game.liftLock && keys.has('ArrowLeft'))  s.rot = Math.max(-90, s.rot - rr * dt);
+    if (!game.liftLock && keys.has('ArrowRight')) s.rot = Math.min(90,  s.rot + rr * dt);
+    if (!game.liftLock && F.handling) s.rot += (Math.sin(game.time * 0.83 + 1.1) + 0.6 * Math.sin(game.time * 2.31)) * 1.8 * F.handling * dt;
     s.thrusting = thrust > 0;
     const r = s.rot * Math.PI / 180, aT = thrust / m;
     s.ax = aT * Math.sin(r);
@@ -535,8 +681,86 @@ button.primary { border-width: 2.5px; }
     game.logT += dt;
     if (game.logT >= 0.1) { game.logT = 0; game.log.push([game.time, Math.max(0, s.alt), s.vy]); if (game.log.length > 400) game.log.shift(); }
 
-    const pts = [...SHIP.feet, ...SHIP.top].map(p => toWorld(p));
+    const pts = [...feetNow(), ...SHIP.top].map(p => toWorld(p));
     if (pts.some(([x, y]) => y <= groundAt(x))) touchdown();
+  }
+
+  // ---------- crew running from the shelter to the ship ----------
+  // After a pickup the surviving astronauts come out of the shelter door one after another and lope to the
+  // ship's ladder: 2.0 m/s for the unhurt (a lunar lope), 0.9 m/s for the injured. The ship can't lift off
+  // until everyone is aboard, so landing closer to the shelter (but outside 30 m) gets them in sooner.
+  const RUN_V = 2.0, LIMP_V = 0.9;
+  function startBoarding(site, safe, injured) {
+    game.boarders = [];
+    const n = safe + injured;
+    for (let i = 0; i < n; i++) game.boarders.push({ x: site.shelterX, y: site.y, v: i < safe ? RUN_V : LIMP_V, delay: i * 0.8, ph: Math.random() * 6, done: false });
+    if (n) game.boardMsg = false;
+  }
+  const boarding = () => game.boarders && game.boarders.some(b => !b.done);
+  function stepBoarders(dt) {
+    if (!game.boarders) return;
+    for (const b of game.boarders) {
+      if (b.done) continue;
+      if (b.delay > 0) { b.delay -= dt; continue; }
+      const d = s.x - b.x, stepX = Math.sign(d) * b.v * dt;
+      if (Math.abs(d) <= Math.abs(stepX) + 0.3) { b.done = true; continue; }   // at the ladder: climbs aboard
+      b.x += stepX; b.ph += b.v * dt * 2.6;   // stride: about 1.2 m per step
+    }
+  }
+  function drawBoarders() {
+    if (!game.boarders) return;
+    const k = view.scale * SHIP_DRAW;   // drawn at the same 25% enlargement as the ship
+    if (k < 1.5) return;
+    ctx.save(); ctx.strokeStyle = '#FFFFFF'; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineWidth = Math.max(1.2, k * 0.12);
+    for (const b of game.boarders) {
+      if (b.done || b.delay > 0) continue;
+      const dir = Math.sign(s.x - b.x) || 1, sw = Math.sin(b.ph), limp = b.v < RUN_V;
+      const hop = limp ? 0 : 0.25 * Math.abs(Math.sin(b.ph));   // low, bounding lope in lunar gravity
+      const P = (lx, ly) => [SX(b.x + dir * lx), SY(groundAt(b.x) + hop + ly)];
+      const hip = P(0, 0.9), sh = P(0.12, 1.42), head = P(0.16, 1.65);
+      const leg = a => P(Math.sin(a) * 0.9, 0.9 - Math.cos(a) * 0.9), arm = a => P(0.12 + Math.sin(a) * 0.5, 1.42 - Math.cos(a) * 0.5);
+      const a1 = 0.6 * sw * (limp ? 0.5 : 1), a2 = -a1;
+      ctx.beginPath();
+      ctx.moveTo(...hip); ctx.lineTo(...leg(a1)); ctx.moveTo(...hip); ctx.lineTo(...leg(a2));
+      ctx.moveTo(...hip); ctx.lineTo(...sh);
+      ctx.moveTo(...sh); ctx.lineTo(...arm(-a1 * 0.8)); ctx.moveTo(...sh); ctx.lineTo(...arm(-a2 * 0.8));
+      ctx.stroke();
+      ctx.beginPath(); ctx.arc(head[0], head[1], 0.17 * k, 0, Math.PI * 2); ctx.fillStyle = '#000000'; ctx.fill(); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // ---------- touchdown dust ----------
+  // Grains thrown out from the pads at touchdown. No air on the Moon, so each one flies a plain ballistic arc
+  // under the world's gravity. The spread grows with the impact speed: a gentle landing puffs, a hard one sprays.
+  const dust = [];
+  const DUST_LIFE = 0.5;   // seconds the grains are drawn
+  function spawnDust(feet, impact) {
+    const n = Math.min(40, Math.round(6 + impact * 5)), spread = 1.5 + impact * 2.2;   // m/s
+    const t0 = performance.now() / 1000;
+    for (const [fx] of feet) {
+      const gy = groundAt(fx);
+      for (let i = 0; i < n; i++) {
+        const dir = Math.random() < 0.5 ? -1 : 1, sp = spread * (0.4 + Math.random() * 0.6);
+        const ang = (10 + Math.random() * 40) * Math.PI / 180;   // low, mostly sideways
+        dust.push({ x: fx + dir * (Math.random() * 1.2), y: gy, vx: dir * sp * Math.cos(ang), vy: sp * Math.sin(ang), t0 });
+      }
+    }
+  }
+  function drawDust() {
+    if (!dust.length) return;
+    const now = performance.now() / 1000;
+    ctx.save(); ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1; ctx.lineCap = 'round';
+    for (let i = dust.length - 1; i >= 0; i--) {
+      const d = dust[i], t = now - d.t0;
+      if (t > DUST_LIFE) { dust.splice(i, 1); continue; }
+      const at = tt => [d.x + d.vx * tt, d.y + d.vy * tt - 0.5 * grav * tt * tt];
+      const [x1, y1] = at(t), [x0, y0] = at(Math.max(0, t - 0.06));
+      if (y1 < groundAt(x1) - 0.1) { dust.splice(i, 1); continue; }
+      ctx.globalAlpha = 0.9 * (1 - t / DUST_LIFE);
+      ctx.beginPath(); ctx.moveTo(SX(x0), SY(y0)); ctx.lineTo(SX(x1), SY(y1)); ctx.stroke();
+    }
+    ctx.restore();
   }
 
   function touchdown() {
@@ -544,49 +768,73 @@ button.primary { border-width: 2.5px; }
     const fa = Math.min(feet[0][0], feet[1][0]), fb = Math.max(feet[0][0], feet[1][0]);
     const flat = flatUnder(fa, fb);
     const upright = Math.abs(s.rot) <= MAX_TILT;
-    const slow = s.vy >= -SAFE_VY && Math.abs(s.vx) <= SAFE_VX;
     const tdv = `Touchdown: ${Math.abs(s.vy).toFixed(1)} m/s down, ${Math.abs(s.vx).toFixed(1)} m/s sideways, ${Math.abs(Math.round(s.rot))}° tilt.`;
     game.log.push([game.time, 0, s.vy]);
     setMain(false); s.thrusting = false;
-    if (!(flat && upright && slow)) {
-      const why = !flat ? 'Not a landing site' : !upright ? 'Tilted too far' : 'Too fast';
+    spawnDust(feet, Math.hypot(s.vx, s.vy));
+    if (!(flat && upright)) {
+      const why = !flat ? 'Not a landing site' : 'Tilted too far';
       game.state = 'over'; hideToast();
       showEnd('Crashed', why + '. ' + tdv + (game.mode === 'mission' && game.cp ? ` Press Space to restart from the ${game.cp.site.name.toLowerCase()} shelter, or R to restart the mission.` : ' Press Space to try again.'));
       return;
     }
+    // hard landing: damage, a snapped leg, random problems
+    const down = Math.max(0, -s.vy), side = Math.abs(s.vx);
+    const over = (v, lim) => v > lim ? Math.floor((v - lim) * 10 + 1e-9) : 0;
+    const dmg = over(down, SAFE()) + over(side, SAFE());
+    const snap = down > SNAP_V || side > SNAP_V;
+    const legSide = side > 0.5 ? Math.sign(s.vx) : Math.abs(s.rot) > 1 ? Math.sign(s.rot) : (Math.random() < 0.5 ? -1 : 1);
+    const vxWas = s.vx;
     s.y = flat.y + 3.5; s.rot = 0; s.vx = 0; s.vy = 0; s.ax = 0; s.ay = 0; s.alt = 0;
     game.state = 'landed';
+    let dmgText = '';
+    if (dmg > 0 || snap) {
+      game.hull = Math.max(0, game.hull - dmg); game.dmgTotal += dmg;
+      dmgText = `Hard landing: ${dmg} damage, hull ${game.hull}/${game.hullMax}.`;
+      if (!game.legGone && (snap || game.dmgTotal >= LEG_LOSS_AT)) {
+        game.legGone = snap ? legSide : (Math.random() < 0.5 ? -1 : 1);
+        dmgText += ` The ${game.legGone < 0 ? 'left' : 'right'} leg broke off.`;
+      }
+      const got = rollFaults(dmg);
+      if (got.length) dmgText += ' New problem: ' + got.map(k => FAULT_NAMES[k]).join(', ') + '.';
+      if (game.hull <= 0) return finalEnd('Ship destroyed', dmgText + ' ' + tdv);
+    }
+    if (game.legGone) startTopple();
+    const tdv2 = dmgText ? tdv + '\n' + dmgText : tdv;
 
     if (game.mode === 'practice') {
       const t = SITES[game.practiceIdx];
-      if (flat !== t) { toast(`Safe landing, but not at the ${t.name.toLowerCase()} shelter.\n${tdv}`); return; }
+      if (flat !== t) { toast(`Landed, but not at the ${t.name.toLowerCase()} shelter.\n${tdv2}`); return; }
       const d = footDist(fa, fb, t), h = harm(d), safe = TEAM - h.injured - h.killed;
       game.state = 'done';
-      showEnd('Landed', tdv + ' Press Space to try again.', { results: [
-        ['Distance from shelter', Math.round(d) + ' m'], ['Safe', safe], ['Injured', h.injured], ['Killed', h.killed],
+      showEnd('Landed', tdv2.replace('\n', ' ') + ' Press Space to try again.', { results: [
+        ['Distance from shelter', Math.round(d) + ' m'], ['Safe', safe], ['Injured', h.injured], ['Killed', h.killed], ['Damage', dmg],
         ['Fuel used', Math.round(100 - game.fuel) + '%'], ['Time', fmtTime(game.time)]
       ] });
       return;
     }
     if (flat.base) {
       if (game.picked.size === SITES.length) return missionComplete();
-      toast(`Base. ${SITES.length - game.picked.size} teams still out.\n${tdv}`);
+      toast(`Base. ${SITES.length - game.picked.size} teams still out.\n${tdv2}`);
       return;
     }
-    if (game.picked.has(flat)) { toast('This team is already aboard.\n' + tdv); return; }
+    if (game.picked.has(flat)) { toast('This team is already aboard.\n' + tdv2); return; }
 
     const d = footDist(fa, fb, flat);
     const h = harm(d), safe = TEAM - h.injured - h.killed;
     const close = d >= DEBRIS ? Math.round(PTS.closeMax * (REACH - d) / (REACH - DEBRIS)) : 0;
     const pts = safe * PTS.safe + h.injured * PTS.injured + h.killed * PTS.killed + Math.max(0, close);
     game.score += pts; game.picked.add(flat);
+    const upText = giveUpgrade();
+    startBoarding(flat, safe, h.injured);
     game.tally.safe += safe; game.tally.injured += h.injured; game.tally.killed += h.killed;
     // checkpoint: a crash or running out of fuel later restarts here, landed at this shelter
-    game.cp = { site: flat, x: s.x, score: game.score, tally: { ...game.tally }, picked: [...game.picked], fuel: game.fuel, time: game.time };
+    game.cp = { site: flat, x: s.x, score: game.score, tally: { ...game.tally }, picked: [...game.picked], fuel: game.fuel, time: game.time,
+      hull: game.hull, hullMax: game.hullMax, dmgTotal: game.dmgTotal, upg: [...game.upg], legGone: game.legGone, faults: { ...game.faults }, lifeLeft: game.lifeLeft, fallen: !!game.legGone };
     const hurt = [h.injured ? `${h.injured} injured` : '', h.killed ? `${h.killed} killed` : ''].filter(Boolean).join(', ');
-    const msg = `Team picked up ${Math.round(d)} m from the shelter: ${safe} safe${hurt ? ', ' + hurt : ''}. ${pts >= 0 ? '+' : ''}${pts} points`;
-    if (settings.edu) showEnd('Team picked up', msg + '. ' + tdv, { cont: true });
-    else toast(msg + '\n' + tdv);
+    const msg = `Team picked up ${Math.round(d)} m from the shelter: ${safe} safe${hurt ? ', ' + hurt : ''}. ${pts >= 0 ? '+' : ''}${pts} points${upText ? '. ' + upText.replace(/\.$/, '') : ''}`;
+    if (settings.edu) showEnd('Team picked up', msg + '. ' + tdv2.replace('\n', ' '), { cont: true });
+    else toast(msg + '\n' + tdv2, 8000);
   }
   const footDist = (fa, fb, t) => Math.max(0, Math.min(Math.abs(fa - t.shelterX), Math.abs(fb - t.shelterX)));
 
@@ -598,7 +846,7 @@ button.primary { border-width: 2.5px; }
     game.state = 'done'; hideToast();
     showEnd('Mission complete', 'Press Space to fly again.', { results: [
       ['Safe', game.tally.safe], ['Injured', game.tally.injured], ['Killed', game.tally.killed],
-      ['Fuel left', Math.ceil(game.fuel) + '%'], ['Time', fmtTime(game.time)], ['Score', game.score]
+      ['Fuel left', Math.ceil(game.fuel) + '%'], ['Hull', game.hull + '/' + game.hullMax], ['Time', fmtTime(game.time)], ['Score', game.score]
     ] });
   }
 
@@ -736,11 +984,17 @@ button.primary { border-width: 2.5px; }
       }
       ctx.stroke();
     }
-    for (const [pts, closed, alpha] of GRACE) {
+    GRACE.forEach(([pts, closed, alpha], i) => {
+      // a broken front leg is not drawn (left: parts 10-15, right: 16-21); a short jagged stub stays on the deck
+      if ((game.legGone < 0 && i >= 10 && i <= 15) || (game.legGone > 0 && i >= 16 && i <= 21)) return;
       const q = pts.map(scr);
       ctx.beginPath(); q.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
       if (closed) { ctx.closePath(); ctx.globalAlpha = 1; ctx.fillStyle = '#000000'; ctx.fill(); }
       ctx.globalAlpha = alpha; ctx.strokeStyle = '#FFFFFF'; ctx.stroke();
+    });
+    if (game.legGone) {
+      const g = game.legGone, stub = [[1.7, -1.4], [2.15, -1.62], [2.0, -1.78], [2.45, -1.95]].map(([x, y]) => scr([g * x, y]));
+      ctx.globalAlpha = 1; ctx.beginPath(); stub.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke();
     }
     ctx.restore();
   }
@@ -772,7 +1026,7 @@ button.primary { border-width: 2.5px; }
 
   function drawBase() {
     const a = SX(BASE.x1), b = SX(BASE.x2), gy = SY(BASE.y), mid = (a + b) / 2;
-    stroke(() => { ctx.moveTo(a, gy); ctx.lineTo(b, gy); }, 3);
+    stroke(() => { ctx.moveTo(a, gy + 2); ctx.lineTo(b, gy + 2); }, 6);
     const h = Math.max(30, 18 * view.scale);
     ctx.beginPath(); ctx.moveTo(b - 6, gy - h); ctx.lineTo(b - 6 - h * .4, gy - h * .85); ctx.lineTo(b - 6, gy - h * .7); ctx.closePath();
     ctx.fillStyle = '#000000'; ctx.fill();   // the flag is solid: nothing shows through it
@@ -820,7 +1074,7 @@ button.primary { border-width: 2.5px; }
     const len = Math.hypot(x1 - x0, y1 - y0);
     if (len < 4) return;
     const hd = Math.min(st.head || 11, len * 0.4), ang = Math.atan2(y1 - y0, x1 - x0);
-    ctx.save(); ctx.globalAlpha = st.alpha ?? 1; ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = st.w; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.save(); ctx.globalAlpha = st.alpha ?? 1; ctx.strokeStyle = st.color || '#FFFFFF'; ctx.lineWidth = st.w; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     ctx.beginPath(); ctx.setLineDash(st.dash || []); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); ctx.setLineDash([]);
     ctx.beginPath(); ctx.moveTo(x1 - hd * Math.cos(ang - .45), y1 - hd * Math.sin(ang - .45)); ctx.lineTo(x1, y1); ctx.lineTo(x1 - hd * Math.cos(ang + .45), y1 - hd * Math.sin(ang + .45));
     ctx.stroke(); ctx.restore();
@@ -837,6 +1091,7 @@ button.primary { border-width: 2.5px; }
     ctx.save(); ctx.fillStyle = '#FFFFFF'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
     for (const L of list) {
       const y = L.y + L.h / 2;
+      ctx.fillStyle = L.color || '#FFFFFF';
       ctx.font = THIN(L.size); ctx.fillText(L.main, L.x, y);
       if (L.sub) { ctx.font = THIN(Math.round(L.size * 0.68)); ctx.fillText(L.sub, L.x + L.w1, y + L.size * 0.28); }
       ctx.font = THIN(L.size); ctx.fillText(L.rest, L.x + L.w1 + L.w2, y);
@@ -871,37 +1126,62 @@ button.primary { border-width: 2.5px; }
     if (view.close && view.landing) {
       // ----- closest view: fixed near the middle of the screen
       // v starts 1.5 cabin diameters (as drawn) to the right of the craft's centre, a the same distance to the left
-      const F = 24, off = 1.5 * 9.2 * k, VX = cx + off, AX = cx - off;
+      const F = 24, off = 1.5 * 9.2 * k, VX = cx + off;
       const near = game.state === 'flying' && !game.launching && nearShelter();
       const comps = settings.vcomp || near;
       const fx = s.vx * VC_SCALE, fy = -s.vy * VC_SCALE;
       const Y0 = Math.min(cy, pxH - 50 - Math.max(0, fy)), AY = cy;   // keep a long downward v arrow on screen
-      if (comps) {
-        ctx.save(); ctx.globalAlpha = 0.4; ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1; ctx.setLineDash([5, 6]);
-        ctx.beginPath(); ctx.moveTo(VX + fx, Y0 + fy); ctx.lineTo(VX + fx, Y0); ctx.moveTo(VX + fx, Y0 + fy); ctx.lineTo(VX, Y0 + fy); ctx.stroke(); ctx.restore();
-        drawArrow(VX, Y0, VX + fx, Y0, { ...COMP, w: 1.6, head: 13 });
-        drawArrow(VX, Y0, VX, Y0 + fy, { ...COMP, w: 1.6, head: 13 });
+      if (near) {
+        // landing near a shelter: only the x and y components, solid, each with its value beside it.
+        // A component over the landing limit flashes: a white box with the arrow and its value in black.
+        const on = performance.now() % 600 < 350;
+        const down = fy >= 0;
+        const Lx = mkLabel('v', 'x', ' = ' + sgn(s.vx) + ' m/s', F, VX + 6, Y0 + (down ? -F * 1.0 : F * 1.0), 'left');
+        const yOff = Math.abs(fy) / 2 < F * 1.3 ? (down ? F * 1.3 : -F * 1.3) : fy / 2;
+        const Ly = mkLabel('v', 'y', ' = ' + sgn(s.vy) + ' m/s', F, VX + 16, Y0 + yOff, 'left');
+        const parts = [
+          { bad: Math.abs(s.vx) > SAFE(), x1: VX + fx, y1: Y0, L: Lx },
+          { bad: s.vy < -SAFE(), x1: VX, y1: Y0 + fy, L: Ly }
+        ];
+        const box = list => {   // one box around the arrows and values given
+          const xs = list.flatMap(c => [VX, c.x1, c.L.x, c.L.x + c.L.w]), ys = list.flatMap(c => [Y0, c.y1, c.L.y, c.L.y + c.L.h]);
+          let x0 = Math.min(...xs) - 14, y0 = Math.min(...ys) - 12, y1 = Math.max(...ys) + 12;
+          // only one flashing: keep its box off the other (white) component, which runs along y = Y0 or down from it
+          if (list.length === 1 && list[0] === parts[0]) { if (down) y1 = Math.min(y1, Y0 + 5); else y0 = Math.max(y0, Y0 - 5); }
+          if (list.length === 1 && list[0] === parts[1]) { if (down) y0 = Math.max(y0, Y0 + 5); else y1 = Math.min(y1, Y0 - 5); }
+          ctx.fillStyle = '#FFFFFF'; ctx.fillRect(x0, y0, Math.max(...xs) + 14 - x0, y1 - y0);
+        };
+        const flashing = on ? parts.filter(c => c.bad) : [];
+        if (flashing.length) box(flashing);   // both too fast: one box around both
+        for (const c of parts) {
+          const inv = flashing.includes(c);
+          if (inv) c.L.color = '#000000';
+          drawArrow(VX, Y0, c.x1, c.y1, { w: 2.5, head: 14, color: inv ? '#000000' : '#FFFFFF' });
+          labels.push(c.L);
+        }
+      } else {
+        if (comps) {
+          ctx.save(); ctx.globalAlpha = 0.4; ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1; ctx.setLineDash([5, 6]);
+          ctx.beginPath(); ctx.moveTo(VX + fx, Y0 + fy); ctx.lineTo(VX + fx, Y0); ctx.moveTo(VX + fx, Y0 + fy); ctx.lineTo(VX, Y0 + fy); ctx.stroke(); ctx.restore();
+          drawArrow(VX, Y0, VX + fx, Y0, { ...COMP, w: 1.6, head: 13 });
+          drawArrow(VX, Y0, VX, Y0 + fy, { ...COMP, w: 1.6, head: 13 });
+        }
+        drawArrow(VX, Y0, VX + fx, Y0 + fy, { w: 3, head: 16 });
+        const down = fy >= 0, right = fx >= 0;
+        // short names on the arrows
+        if (comps && Math.abs(fx) >= 20) labels.push(mkLabel('v', 'x', '', F, VX + fx / 2, Y0 + (down ? -F * 0.8 : F * 0.8), 'center'));
+        if (comps && Math.abs(fy) >= 20) labels.push(mkLabel('v', 'y', '', F, VX + (right ? -10 : 10), Y0 + fy / 2, right ? 'right' : 'left'));
+        if (comps && Math.hypot(fx, fy) >= 4) labels.push(mkLabel('v', '', '', F, VX + fx + (right ? 10 : -10), Y0 + fy + (down ? F * 0.6 : -F * 0.6), right ? 'left' : 'right'));
+        // the values, in a column to the right of the v arrows
+        const yName = comps && Math.abs(fy) >= 20 && !right ? F * 1.4 : 0;
+        const bx = Math.max(VX, VX + fx) + 30 + yName;
+        const rows = comps ? [['', vText], ['x', ' = ' + sgn(s.vx) + ' m/s'], ['y', ' = ' + sgn(s.vy) + ' m/s']] : [['', vText]];
+        const by = Math.max(F * 1.6, Math.min(pxH - F * 4.5, Y0 + fy / 2 - F * 1.3 * (rows.length - 1) / 2));
+        rows.forEach(([sub, t], n) => labels.push(mkLabel('v', sub, t, F, bx, by + n * F * 1.3, 'left')));
       }
-      drawArrow(VX, Y0, VX + fx, Y0 + fy, { w: 3, head: 16 });
-      const A = A_REF * arrowZoom(), ax = s.ax * A, ay = -s.ay * A;
-      drawArrow(AX, AY, AX + ax, AY + ay, { w: 1.6, alpha: 0.8, dash: [1, 6], head: 14 });
+      // no a arrow in the closest view: near the ground only velocity matters (a is shown in the other views)
       ctx.save(); ctx.fillStyle = '#FFFFFF';
-      ctx.beginPath(); ctx.arc(VX, Y0, 3, 0, Math.PI * 2); ctx.moveTo(AX + 3, AY); ctx.arc(AX, AY, 3, 0, Math.PI * 2); ctx.fill(); ctx.restore();
-      const down = fy >= 0, right = fx >= 0;
-      // short names on the arrows
-      if (comps && Math.abs(fx) >= 20) labels.push(mkLabel('v', 'x', '', F, VX + fx / 2, Y0 + (down ? -F * 0.8 : F * 0.8), 'center'));
-      if (comps && Math.abs(fy) >= 20) labels.push(mkLabel('v', 'y', '', F, VX + (right ? -10 : 10), Y0 + fy / 2, right ? 'right' : 'left'));
-      if (comps && Math.hypot(fx, fy) >= 4) labels.push(mkLabel('v', '', '', F, VX + fx + (right ? 10 : -10), Y0 + fy + (down ? F * 0.6 : -F * 0.6), right ? 'left' : 'right'));
-      // the values, in a column to the right of the v arrows
-      const yName = comps && Math.abs(fy) >= 20 && !right ? F * 1.4 : 0;
-      const bx = Math.max(VX, VX + fx) + 30 + yName;
-      const rows = comps ? [['', vText], ['x', ' = ' + sgn(s.vx) + ' m/s'], ['y', ' = ' + sgn(s.vy) + ' m/s']] : [['', vText]];
-      const by = Math.max(F * 1.6, Math.min(pxH - F * 4.5, Y0 + fy / 2 - F * 1.3 * (rows.length - 1) / 2));
-      rows.forEach(([sub, t], n) => labels.push(mkLabel('v', sub, t, F, bx, by + n * F * 1.3, 'left')));
-      // a: label beyond its tip, on the side away from the ship unless a points clearly right; kept on screen
-      const aL = Math.hypot(ax, ay), aR = aL >= 4 && ax > 2;
-      const lx = aL < 4 ? AX - 14 : AX + ax + (aR ? 12 : -12), ly = aL < 4 ? AY : AY + ay + (Math.abs(ax) < aL * 0.4 ? (ay > 0 ? F * 0.8 : -F * 0.8) : 0);
-      labels.push(mkLabel('a', '', aText, F, lx, Math.max(70 + F, Math.min(pxH - F, ly)), aR ? 'left' : 'right'));
+      ctx.beginPath(); ctx.arc(VX, Y0, 3, 0, Math.PI * 2); ctx.fill(); ctx.restore();
       return labels;
     }
 
@@ -941,19 +1221,12 @@ button.primary { border-width: 2.5px; }
     return separate(labels, cy);
   }
 
+  // marker 300 m straight above the next shelter (or base on the way home), pointing down at it
   function drawTargetPointer() {
     if (!['flying', 'landed', 'ready'].includes(game.state)) return;
-    const t = target(), tx = SX(t.x), ty = SY(t.y), m = 26;
-    if (tx > m && tx < pxW - m && ty > m && ty < pxH - m) return;
-    const cx = pxW / 2, cy = pxH / 2, dx = tx - cx, dy = ty - cy;
-    const f = Math.min((pxW / 2 - m) / Math.abs(dx || 1e-6), (pxH / 2 - m) / Math.abs(dy || 1e-6));
-    // keep clear of the next-team display in the bottom-right corner
-    let px = cx + dx * f, py = cy + dy * f;
-    if (px > pxW - 260 && Math.abs(py - pxH / 2) < 50) py = pxH / 2 + (py < pxH / 2 ? -50 : 50);
-    if (px < 520 && py > pxH - 125) py = pxH - 125;   // and of the minimap (bottom left)
-    ctx.save(); ctx.translate(px, py); ctx.rotate(Math.atan2(dy, dx));
-    stroke(() => { ctx.moveTo(-14, -9); ctx.lineTo(0, 0); ctx.lineTo(-14, 9); ctx.closePath(); }, 2);
-    ctx.restore();
+    const t = target(), x = SX(t.x), y = SY(t.y + 300);
+    if (x < -40 || x > pxW + 40 || y < -60 || y > pxH + 60) return;
+    stroke(() => { ctx.moveTo(x, y - 22); ctx.lineTo(x, y + 22); ctx.moveTo(x - 12, y + 9); ctx.lineTo(x, y + 22); ctx.lineTo(x + 12, y + 9); }, 2.5);
   }
 
   // educational mode: dots every 0.5 s along the path the ship would follow with the engine off
@@ -1040,11 +1313,13 @@ button.primary { border-width: 2.5px; }
     }
     for (const t of SITES) {
       if (SX(t.x2) < -60 || SX(t.x1) > pxW + 60) continue;
-      stroke(() => { ctx.moveTo(SX(t.x1), SY(t.y)); ctx.lineTo(SX(t.x2), SY(t.y)); }, 3);
+      stroke(() => { ctx.moveTo(SX(t.x1), SY(t.y) + 2); ctx.lineTo(SX(t.x2), SY(t.y) + 2); }, 6);   // thick, top edge on the surface
       drawShelter(t);
     }
     drawBase();
-    if (settings.edu && (game.state === 'flying' || game.state === 'ready')) drawCoastPath();
+    drawDust();
+    drawBoarders();
+    if ((settings.edu || game.upg.has('path')) && (game.state === 'flying' || game.state === 'ready')) drawCoastPath();
     const vecLabels = drawVectors();   // the arrows go behind the ship
     drawShip();
     drawLabels(vecLabels);               // their labels go on top
@@ -1064,10 +1339,9 @@ button.primary { border-width: 2.5px; }
   // ---------- minimap (upgrade from the first team picked up) ----------
   // A strip at the bottom left showing the terrain ahead: 5 km wide, 1.5 km tall, the ship 15% in from
   // the side it is coming from, looking toward the next team. Tune with the numbers below.
-  const MINI = { span: 5850, height: 1500, base: -100, shipAt: 0.15 };   // shows heights from -100 m to 1,400 m
+  const MINI = { span: 5850, height: 1500, base: -100, shipAt: 0.5 };   // ship in the middle   // shows heights from -100 m to 1,400 m
   // TUNING: always on for now. When the upgrade system goes in, unlock it with the first pickup:
-  // const hasMinimap = () => game.mode === 'practice' || game.picked.size >= 1;
-  const hasMinimap = () => true;
+  const hasMinimap = () => game.mode === 'practice' || game.upg.has('minimap');
   function drawMinimap() {
     const c = $('minimap'), on = hasMinimap() && game.state !== 'intro';
     c.hidden = !on; if (!on) return;
@@ -1083,10 +1357,16 @@ button.primary { border-width: 2.5px; }
     g.fillStyle = '#FFFFFF';
     for (const f of FLATS) {
       if (X(f.x2) < 0 || X(f.x1) > W) continue;
-      g.fillRect(X(f.x1), Y(f.y) - 2, Math.max(4, (f.x2 - f.x1) * k), 4);
+      g.fillRect(X(f.x1), Y(f.y) - 2, Math.max(6, (f.x2 - f.x1) * k), 7);
       if (!f.base && !game.picked.has(f)) { g.beginPath(); g.moveTo(X(f.shelterX), Y(f.y) + 26); g.lineTo(X(f.shelterX), Y(f.y) + 8); g.moveTo(X(f.shelterX) - 6, Y(f.y) + 15); g.lineTo(X(f.shelterX), Y(f.y) + 8); g.lineTo(X(f.shelterX) + 6, Y(f.y) + 15); g.stroke(); }
     }
     g.beginPath(); g.arc(X(s.x), Math.max(6, Math.min(H - 6, Y(s.y))), 6, 0, Math.PI * 2); g.fill();
+    // small blinking arrow just above the next shelter (or base on the way home), pointing down at it
+    const tx = X(t.x), ty = Math.max(40, Y(t.y) - 10);
+    if (tx > 0 && tx < W && performance.now() % 800 < 500) {
+      g.lineWidth = 3; g.lineCap = 'round'; g.beginPath();
+      g.moveTo(tx, ty - 30); g.lineTo(tx, ty); g.moveTo(tx - 9, ty - 10); g.lineTo(tx, ty); g.lineTo(tx + 9, ty - 10); g.stroke();
+    }
   }
   function drawFBD() {
     const flying = game.state === 'flying' || game.state === 'ready';
@@ -1187,15 +1467,43 @@ button.primary { border-width: 2.5px; }
   function updateUI(dt) {
     const t = target(), dx = t.x - s.x, dy = t.y - (s.y - 3.5);
     $('rNext').textContent = distText(Math.hypot(dx, dy));
-    drawNav(dx, dy);
+    // the arrow points from where it sits on screen straight at the shelter (on screen or beyond the edge)
+    const nr = $('navArrow').getBoundingClientRect(), sr = stage.getBoundingClientRect();
+    const ax = nr.left + nr.width / 2 - sr.left, ay = nr.top + nr.height / 2 - sr.top;
+    drawNav(SX(t.x) - ax, -(SY(t.y) - ay));
     $('rF').textContent = Math.ceil(game.fuel) + '%';
+    $('rTime').textContent = fmtTime(game.time) + (game.state === 'landed' && boarding() ? '  ×3' : '');
+    $('timeBox').hidden = game.state === 'intro';
+    $('rHull').textContent = game.hull + '/' + game.hullMax;
+    $('hullFill').style.width = Math.max(0, game.hull / game.hullMax * 100) + '%';
+    const F = game.faults, lvl = n => n > 1 ? ' ×' + n : '', lines = [];
+    if (game.legGone) lines.push((game.legGone < 0 ? 'Left' : 'Right') + ' leg broken');
+    if (F.handling) lines.push('Worse handling' + lvl(F.handling));
+    if (F.fuel) lines.push('Fuel use +15%');
+    if (F.misfire) lines.push('Engine misfires' + lvl(F.misfire));
+    if (F.coolant) lines.push('Coolant leak' + lvl(F.coolant));
+    if (game.lifeLeft !== null) lines.push('Life support ' + fmtTime(Math.max(0, game.lifeLeft)));
+    const short = { minimap: 'Minimap', path: 'Trajectory path', turning: 'Faster turning', economy: 'Fuel economy', shocks: 'Shock absorbers', plating: 'Hull plating' };
+    if (game.upg.size) lines.push('Upgrades:', ...[...game.upg].map(k => '  ' + short[k]));
+    const ft = lines.join('\n');
+    if ($('faults').dataset.t !== ft) {
+      $('faults').dataset.t = ft; $('faults').innerHTML = '';
+      for (const l of lines) { const d = document.createElement('div'); d.textContent = l; $('faults').append(d); }
+    }
+    $('fbd').style.top = ($('hullBox').offsetTop + $('hullBox').offsetHeight + 8) + 'px';
+    $('heatWrap').hidden = !F.coolant;
+    $('heatFill').style.width = Math.round(game.heat * 100) + '%';
+    $('rHeat').textContent = game.overheat ? 'HOT' : Math.round(game.heat * 100) + '%';
+    const firing = game.main && !game.overheat && !(game.misfireT > 0);
+    $('rPow').textContent = game.overheat && game.main ? 'HOT' : game.main && game.misfireT > 0 ? 'MISFIRE' : game.main ? 'ON' : 'OFF';
+    $('rPow').classList.toggle('on', firing);
     $('fuelFill').style.width = Math.max(0, game.fuel) + '%';
     // big altitude readout, close view only: feet to the ground directly below
     $('altBig').hidden = !view.close || game.state === 'intro' || game.state === 'ready';
     $('rH').textContent = Math.max(0, s.alt).toFixed(1) + ' m';
     flash += dt;
     const flying = game.state === 'flying';
-    const danger = flying && s.alt < 10 && (s.vy < -SAFE_VY || Math.abs(s.vx) > SAFE_VX);
+    const danger = flying && s.alt < 10 && (s.vy < -SAFE() || Math.abs(s.vx) > SAFE());
     const lowFuel = (flying || game.state === 'landed') && game.fuel < 10;
     const w = $('warn');
     if (danger) w.textContent = 'Altitude warning: too fast';
@@ -1208,7 +1516,9 @@ button.primary { border-width: 2.5px; }
   // ---------- loop ----------
   let last = performance.now(), acc = 0;
   function frame(now) {
-    const dtReal = Math.min(0.1, (now - last) / 1000); last = now; acc += dtReal;
+    const dtReal = Math.min(0.1, (now - last) / 1000); last = now;
+    // while the crew runs to the ship, the game (and the mission timer) fast-forwards 3x
+    acc += dtReal * (game && game.state === 'landed' && boarding() ? 3 : 1);
     const h = 1 / 120;
     while (acc >= h) { step(h); acc -= h; }
     updateView(); draw(); updateUI(dtReal);
@@ -1243,6 +1553,8 @@ button.primary { border-width: 2.5px; }
     setup('mission');
     Object.assign(game, { score: cp.score, tally: { ...cp.tally }, picked: new Set(cp.picked), fuel: cp.fuel, time: cp.time, cp });
     Object.assign(s, { x: cp.x, y: cp.site.y + 3.5, vx: 0, vy: 0, rot: 0, ax: 0, ay: 0, alt: 0 });
+    Object.assign(game, { hull: cp.hull, hullMax: cp.hullMax, dmgTotal: cp.dmgTotal, upg: new Set(cp.upg), legGone: cp.legGone, faults: { ...cp.faults }, lifeLeft: cp.lifeLeft });
+    if (cp.legGone) { startTopple(); game.topple.t = 1; setPose(game.topple.F, game.topple.pf, game.topple.to); game.topple = null; }   // already lying over
     view.close = true; view.landing = false; view.place = true; view.resetY = true;
     $('overlay').hidden = true; window.focus();
   }
