@@ -1,0 +1,1438 @@
+<meta charset="utf-8">
+<title>Free-Fall Tracker</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: video with the data table beside it; scale and results in a row below. One column on phones. */
+:root {
+  /* AeroLab theme tokens (Emerald on Deep Forest), copied as hex so canvas drawing can read them */
+  --bg: #12291F; --panel: #FFFFFF; --ink: #12291F; --muted: #3A5247; --line: #BFDCCD;
+  --accent: #1E5E46; --accent-ink: #FFFFFF; --accent-soft: #D2E8DD;
+  --stage: #0B1C15; --warn: #8A5A00;
+  /* colors that carry meaning in the data stay as they were */
+  --mark: #E0287A; --scale: #13A6C2;
+  --hcol: #FF8A1F; --vcol: #2E8BFF; --acol: #E8344E;
+  --f-display: "Varela Round", "Lexend", sans-serif;
+  --f-body: "Lexend", system-ui, sans-serif;
+  --f-data: ui-monospace, "SFMono-Regular", Consolas, monospace;
+}
+
+body { margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 14px 32px; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+h2 { font-family: var(--f-display); font-weight: 400; font-size: 1.4rem; margin: 0; color: var(--ink); }
+h3 { font-size: 1.1rem; font-weight: 600; margin: 0; color: var(--muted); }
+label.inline { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+input[type=number] { width: 6.5em; }
+
+/* Layout: frame controls on top, video full width with a floating control panel, then data + scale on the left and results on the right. */
+.page { max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+.viewer { min-width: 0; }
+.lower { display: grid; grid-template-columns: minmax(280px, 380px) minmax(0, 1fr); gap: 18px; align-items: start; }
+.leftcol { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+@media (max-width: 760px) { .lower { grid-template-columns: minmax(0, 1fr); } }
+
+/* floating control panel over the video */
+.panel { position: absolute; top: 10px; right: 10px; z-index: 4; width: 200px; max-width: calc(100% - 20px); background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 6px 20px rgba(0,0,0,.35); line-height: 1.45; }
+.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 6px 6px 12px; }
+.panel-head h2 { font-size: 1rem; }
+.panel-head button { padding: 2px 10px; font-size: 1.1rem; line-height: 1.2; }
+.panel-body { display: flex; flex-direction: column; gap: 8px; padding: 0 10px 10px; }
+.panel-body select { width: 100%; }
+.panel-body button { width: 100%; text-align: left; }
+.panel.min { width: auto; }
+.panel.min .panel-body { display: none; }
+.float-btn { position: absolute; top: 10px; left: 10px; z-index: 3; line-height: 1.2; }
+.controlbar { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; align-items: stretch; }
+.controls { flex: 0 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.chooser { display: flex; justify-content: flex-end; }
+.help-btn { left: auto; right: 8px; }
+.vec-btn { top: auto; left: auto; right: 10px; bottom: 10px; }
+.hint { flex: 1 1 320px; min-width: 0; display: flex; align-items: center; margin: 0; padding: 10px 16px; border-radius: var(--aero-radius-sm, 12px); background: var(--accent-soft); color: var(--ink); font-size: 1.2rem; line-height: 1.4; }
+.stage { display: flex; justify-content: center; align-items: center; padding: 10px; min-height: 320px; position: relative; }
+.wrap { position: relative; display: inline-block; line-height: 0; }
+#frame, #wrap video { display: block; max-width: 100%; max-height: 72vh; height: auto; width: auto; transition: filter .25s; }
+.desat { filter: saturate(.08) brightness(1.04); }
+#overlay { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+#overlay.viewing { cursor: default; }
+#loupe { position: absolute; width: 290px; height: 290px; border-radius: 50%; border: 3px solid #FFFFFF; box-shadow: 0 4px 16px rgba(0,0,0,.45); pointer-events: none; }
+#stageMsg { color: #E4EAEF; max-width: 34em; text-align: center; padding: 30px 16px; line-height: 1.5; }
+#stageMsg code { font-family: var(--f-data); }
+.key { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+.dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.35); }
+
+.check { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; cursor: pointer; }
+.swatch { width: 14px; height: 4px; border-radius: 2px; background: var(--acol); }
+.transport { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 12px; }
+.transport input[type=range] { flex: 1 1 200px; min-width: 0; }
+.readout { font-family: var(--f-data); font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; letter-spacing: 0; word-spacing: 0; }
+
+.card { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.muted { color: var(--muted); }
+.results { display: flex; flex-wrap: wrap; gap: 8px 28px; align-items: flex-end; }
+.big { font-family: var(--f-display); font-weight: 400; font-size: 2.8rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.big small { font-size: 1.1rem; color: var(--muted); margin-left: 4px; }
+.big-label { color: var(--muted); font-weight: 600; }
+.warn { color: var(--warn); }
+.fit { font-family: var(--f-data); color: var(--muted); overflow-wrap: anywhere; letter-spacing: 0; word-spacing: 0; }
+.graph { width: 100%; height: 230px; display: block; }
+.graphs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 20px; }
+@media (max-width: 640px) { .graphs { grid-template-columns: minmax(0, 1fr); } }
+.gbox { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.gbox p { margin: 0; }
+
+.tablebox { max-height: 50vh; min-height: 160px; overflow: auto; border: 1px solid var(--line); border-radius: 12px; }
+table { font-size: 1.06rem; }
+th { position: sticky; top: 0; white-space: nowrap; }
+tbody tr { cursor: pointer; }
+tr.current td { font-weight: 600; }
+#copyFallback { width: 100%; height: 90px; font-family: var(--f-data); }
+.explain-body { max-width: 62ch; }
+.explain-body p, .explain-body ul { margin: 10px 0 0; }
+.explain-body ul { padding-left: 1.2em; display: flex; flex-direction: column; gap: 4px; }
+.eq { font-family: var(--f-data); font-size: 1.1rem; text-align: center; background: var(--accent-soft); border-radius: 12px; padding: 10px; letter-spacing: 0; }
+.eq-inline { font-family: var(--f-data); white-space: nowrap; }
+.yours { background: var(--accent-soft); border-radius: 12px; padding: 12px 14px; font-variant-numeric: tabular-nums; }
+/* pop-up tutorial */
+.tour { position: fixed; z-index: 50; width: min(380px, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 8px; }
+.tour h3 { font-size: 1.2rem; color: var(--ink); }
+.tour p { margin: 0; }
+.tour-count { color: var(--muted); font-weight: 600; }
+.tour-btns { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.tour-btns .spacer { flex: 1; }
+.sim-ctl { padding: 4px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
+.sim-ctl input { width: 150px; accent-color: var(--accent); }
+.sim-ctl output { font-family: var(--f-data); min-width: 5.2em; }
+.tour-target { outline: 4px solid #E0B43C !important; outline-offset: 4px; }
+#videoHolder { position: fixed; left: 0; top: 0; width: 2px; height: 2px; opacity: 0; pointer-events: none; overflow: hidden; }
+/* Vertical videos: the video fills the window height on the left and everything else sits beside it. */
+@media (min-width: 761px) {
+  .page.portrait { display: grid; grid-template-columns: max-content minmax(0, 1fr); grid-template-rows: auto auto auto 1fr auto;
+    grid-template-areas: "stage controls" "stage transport" "stage vizkey" "stage lower" "stage chooser"; column-gap: 18px; row-gap: 12px; align-items: start; }
+  .page.portrait .viewer { display: contents; }
+  .page.portrait .controlbar { grid-area: controls; margin-bottom: 0; }
+  .page.portrait #stage { grid-area: stage; position: sticky; top: 14px; padding: 8px; min-height: 0; }
+  .page.portrait #frame, .page.portrait #wrap video { max-height: calc(100vh - 44px); }
+  .page.portrait .transport { grid-area: transport; margin-top: 0; }
+  .page.portrait #vizKey { grid-area: vizkey; }
+  .page.portrait .lower { grid-area: lower; }
+  .page.portrait .chooser { grid-area: chooser; }
+  /* beside a vertical video: graphs (stacked) under the frame controls, data at the bottom */
+  .page.portrait .lower { display: flex; flex-direction: column; }
+  .page.portrait .leftcol { order: 2; }
+  .page.portrait .graphs { grid-template-columns: minmax(0, 1fr); }
+  .page.simvid .controlbar { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { #frame, #wrap video { transition: none; } }
+</style>
+<link rel="stylesheet" href="aerolab.css">
+<style>
+/* app-specific adjustments that must come after the theme */
+.stage.aero-stage { overflow: visible; }
+.transport.aero-bar, .controlbar.aero-bar { margin: 0; }
+.chooser .aero-bar { display: inline-flex; }
+.tour.aero-panel { background: #FFFFFF; }
+</style>
+
+<main class="page">
+  <section class="viewer">
+    <div class="controlbar aero-bar">
+      <div class="controls" id="controls">
+        <button id="toolScale" aria-pressed="true">1 · Set scale</button>
+        <button id="toolMark" aria-pressed="false">2 · Mark ball</button>
+        <button id="toolViz" aria-pressed="false" hidden>3 · Visualize</button>
+      </div>
+      <p class="hint" id="hint" aria-live="polite"></p>
+    </div>
+    <div class="stage aero-stage" id="stage">
+      <div class="wrap" id="wrap">
+        <canvas id="frame" width="540" height="960"></canvas>
+        <canvas id="overlay" width="540" height="960" aria-label="Video frame. Click to place points."></canvas>
+        <canvas id="loupe" hidden></canvas>
+        <button id="helpBtn" class="float-btn help-btn">? Help</button>
+        <button id="vecBtn" class="float-btn vec-btn" aria-pressed="false" hidden>Show vectors</button>
+      </div>
+      <div id="stageMsg" hidden></div>
+    </div>
+    <div class="transport aero-bar" id="transport">
+      <button id="prev" class="big-btn" aria-label="Previous frame">‹ Back</button>
+      <button id="play" class="big-btn" hidden>Play</button>
+      <button id="next" class="big-btn primary" aria-label="Next frame">Next ›</button>
+      <input type="range" id="scrub" min="0" max="0" value="0" aria-label="Frame">
+      <span class="readout" id="frameReadout">Frame 0</span>
+      <label class="inline" for="stepSelect" hidden><span class="muted">Step</span>
+        <select id="stepSelect">
+          <option value="1">1 frame</option><option value="2">2 frames</option><option value="3" selected>3 frames</option>
+          <option value="4">4 frames</option><option value="5">5 frames</option><option value="10">10 frames</option>
+        </select>
+      </label>
+    </div>
+    <div id="vizKey" class="aero-bar" hidden style="margin-top: 12px; flex-direction: column; align-items: flex-start; gap: 6px;">
+      <div class="row">
+        <span class="key"><span class="dot" style="background: var(--hcol)"></span>Horizontal motion</span>
+        <span class="key"><span class="dot" style="background: var(--vcol)"></span>Vertical motion</span>
+        <span class="muted">Grid squares are 10 cm.</span>
+      </div>
+      <div class="row">
+        <label class="check" for="showVel"><input type="checkbox" id="showVel" checked> Velocity arrows <span class="muted">(1 square = 1 m/s)</span></label>
+        <label class="check" for="showAcc"><input type="checkbox" id="showAcc" checked> <span class="swatch"></span>Acceleration arrow <span class="muted">(1 square = 5 m/s²)</span></label>
+      </div>
+    </div>
+  </section>
+
+  <div class="lower">
+    <div class="leftcol">
+      <div class="card aero-panel" id="dataCard">
+        <div class="row" style="justify-content: space-between;">
+          <h2>Data</h2>
+          <span class="muted" id="countText">0 points</span>
+        </div>
+        <div class="muted" id="tiltNote" hidden></div>
+        <div class="muted">Mark only while the ball is flying freely: start after it has been released, and stop before it hits the floor or anything else. The first marked point is the origin. Up and right are positive.</div>
+        <div class="tablebox">
+          <table>
+            <thead id="thead"></thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+        <div class="row">
+          <button id="copyData">Copy data</button>
+          <button id="removeMark">Remove this frame's mark</button>
+          <button id="clearMarks">Clear all marks</button>
+        </div>
+        <textarea id="copyFallback" hidden readonly aria-label="Data to copy"></textarea>
+      </div>
+    </div>
+
+    <div class="card aero-panel" id="resultCard">
+      <h2>Result</h2>
+      <div class="results">
+        <div><div class="big-label">g</div><div class="big" id="gValue">—<small>m/s²</small></div></div>
+        <div id="vxBox" hidden><div class="big-label">Horizontal velocity</div><div class="big" id="vxValue">—<small>m/s</small></div></div>
+      </div>
+      <div class="fit" id="fitText">Mark at least 3 frames to fit a curve.</div>
+      <div class="fit" id="fitTextX" hidden></div>
+      <div class="graphs">
+        <div class="gbox" id="gbX" hidden><h3>Horizontal position vs. time</h3><canvas class="graph" id="graphX" aria-label="Graph of horizontal position versus time"></canvas></div>
+        <div class="gbox"><h3 id="graphYTitle">Position vs. time</h3><canvas class="graph" id="graphY" aria-label="Graph of vertical position versus time"></canvas></div>
+        <div class="gbox" id="gbVX" hidden><h3>Horizontal velocity vs. time</h3><canvas class="graph" id="graphVX" aria-label="Graph of horizontal velocity versus time"></canvas><p class="muted" id="capVX"></p></div>
+        <div class="gbox"><h3 id="graphVYTitle">Velocity vs. time</h3><canvas class="graph" id="graphVY" aria-label="Graph of vertical velocity versus time"></canvas><p class="muted" id="capVY"></p></div>
+      </div>
+      <p class="muted">On the velocity graphs, each dot is the velocity between the marks just before and just after it. The line comes from the fitted curve.</p>
+
+      <details id="explain">
+        <summary>How is g found from my data?</summary>
+        <div class="explain-body">
+          <div id="explainFall">
+            <p>While the ball falls, gravity speeds it up at a constant rate. When acceleration is constant, position changes with time according to this equation:</p>
+            <p class="eq">y = y₀ + v₀t + ½at²</p>
+            <p>The app finds the curve <span class="eq-inline">y = At² + Bt + C</span> that comes closest to all of your points. That's the line drawn on the graph. It picks A, B, and C so that the vertical gaps between the curve and your points, squared and added up, are as small as possible.</p>
+            <p>Matching the two equations term by term:</p>
+            <ul>
+              <li><b>C</b> matches y₀, the starting position. It comes out near 0 because your first mark is the origin.</li>
+              <li><b>B</b> matches v₀, the ball's velocity at your first mark. It isn't 0 because you started marking after the ball was already falling.</li>
+              <li><b>A</b> matches ½a. So the acceleration is a = 2A.</li>
+            </ul>
+          </div>
+          <div id="explainProj" hidden>
+            <p>A thrown ball's motion can be split into a horizontal part and a vertical part. The two happen at the same time without affecting each other.</p>
+            <p><b>Horizontal.</b> After the ball leaves the hand, nothing pushes it sideways (ignoring air resistance), so it moves sideways at a steady speed:</p>
+            <p class="eq">x = x₀ + vₓt</p>
+            <p>The app fits a straight line <span class="eq-inline">x = Dt + E</span> to your horizontal positions. The slope D is the horizontal velocity, vₓ.</p>
+            <p><b>Vertical.</b> Gravity speeds the ball up downward at a constant rate, exactly as it does for a dropped ball:</p>
+            <p class="eq">y = y₀ + v₀t + ½at²</p>
+            <p>The app fits the curve <span class="eq-inline">y = At² + Bt + C</span>, choosing A, B, and C so that the vertical gaps between the curve and your points, squared and added up, are as small as possible. Matching the two equations term by term:</p>
+            <ul>
+              <li><b>C</b> matches y₀, the starting position, near 0 because your first mark is the origin.</li>
+              <li><b>B</b> matches v₀, the ball's vertical velocity at your first mark. Positive means it was still rising.</li>
+              <li><b>A</b> matches ½a. So the acceleration is a = 2A.</li>
+            </ul>
+          </div>
+          <p id="explainYours" class="yours"></p>
+        </div>
+      </details>
+    </div>
+  </div>
+  <footer class="chooser">
+    <div class="aero-bar"><label class="inline" for="videoSelect">Video <select id="videoSelect"></select></label></div>
+  </footer>
+</main>
+<div class="tour aero-panel" id="tour" role="dialog" aria-labelledby="tourTitle" hidden>
+  <div class="tour-count" id="tourCount"></div>
+  <h3 id="tourTitle"></h3>
+  <p id="tourText"></p>
+  <div class="tour-btns">
+    <button id="tourSkip">Close</button>
+    <span class="spacer"></span>
+    <button id="tourBack">Back</button>
+    <button id="tourNext" class="primary">Next</button>
+  </div>
+</div>
+<div class="tour confirm aero-panel" id="scaleConfirm" role="dialog" aria-labelledby="scaleConfirmTitle" hidden>
+  <h3 id="scaleConfirmTitle">Is your scale right?</h3>
+  <p id="scaleConfirmText"></p>
+  <div class="tour-btns">
+    <button id="scaleRedo">Redo</button>
+    <span class="spacer"></span>
+    <button id="scaleAccept" class="primary">Use this scale</button>
+  </div>
+</div>
+<div id="videoHolder"></div>
+
+<script>
+/* ============================================================
+   VIDEO LIST
+   The app reads its videos from a videos.json file. Right now that file and the
+   videos sit in the "videos" folder next to this page on Cloudflare Pages,
+   because the school filter blocks the R2 bucket's r2.dev address for students.
+   If IT unblocks it, change the address below back to:
+   https://pub-5774f50f24e84298bcecc87dc3230d23.r2.dev/videos.json
+   Each entry in videos.json looks like this:
+     { "name": "Drop 1", "file": "drop-1.mp4", "fps": 30, "captureFps": 30, "step": 1, "motion": "fall" }
+   file:       the video's file name in the bucket (or a full web address).
+   fps:        frames per second stored IN THE FILE (what HandBrake reports).
+   captureFps: the real frame rate the camera recorded at. For a slow-motion
+               clip saved as a slowed-down 30 fps file, fps = 30 and captureFps = 240.
+   motion:     "fall" for a dropped object, "projectile" for a thrown one.
+   step:       (optional) frames to advance per click. Default 3; use 1 for 30 fps clips.
+   scaleLength:(optional) real length in meters of the reference students click. Default 1.
+   tilt:       (optional) camera tilt in degrees, corrected in the measurements. Negative means
+               a vertical object's top leans left in the video. Default 0.
+   depth:      (optional) correction for a ball that moves toward or away from the camera, or
+               flies in front of or behind the meter stick: { "rate", "refTime", "planeScale" }.
+   ============================================================ */
+const VIDEO_LIST_URL = "videos/videos.json";
+
+// Built-in simulated videos for testing. Set to true to show them in the Video menu.
+const SHOW_DEMOS = false;
+const VIDEOS = SHOW_DEMOS ? [
+  { name: "Demo: dropped ball (built in)", demo: "fall" },
+  { name: "Demo: thrown ball (built in)", demo: "projectile" },
+] : [];
+
+const $ = id => document.getElementById(id);
+const frameCv = $("frame"), fctx = frameCv.getContext("2d");
+const overlay = $("overlay"), octx = overlay.getContext("2d");
+const loupe = $("loupe"), lctx = loupe.getContext("2d");
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+let source = null, frame = 0, mode = "scale", loadToken = 0, fitState = null, playing = false;
+let scale = { a: null, b: null };
+const marks = new Map();
+const isProj = () => source && source.motion === "projectile";
+
+/* ---------- Built-in demos ---------- */
+function makeFallDemo() {
+  // Simulated 120 fps clip of a ball dropped beside a meter stick. g = 9.80 m/s².
+  const W = 540, H = 960, FPS = 120, PXM = 700, top = 120, y0 = 150, floorY = 880, R = 22, tRel = 10.37 / FPS;
+  return {
+    width: W, height: H, frames: 75, fps: FPS, captureFps: FPS, motion: "fall",
+    draw(ctx, n) {
+      const g = ctx.createLinearGradient(0, 0, W, 0);
+      g.addColorStop(0, "#C9C4B8"); g.addColorStop(1, "#B9B3A6");
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = "#6E6457"; ctx.fillRect(0, floorY, W, H - floorY);
+      ctx.fillStyle = "#5A5147"; ctx.fillRect(0, floorY, W, 4);
+      ctx.fillStyle = "#E3C35A"; ctx.fillRect(150, top - 10, 44, PXM + 20);
+      ctx.strokeStyle = "#8A6E1E"; ctx.lineWidth = 1; ctx.strokeRect(150.5, top - 9.5, 43, PXM + 19);
+      ctx.fillStyle = "#2A2418"; ctx.font = "13px sans-serif"; ctx.textAlign = "right";
+      for (let cm = 0; cm <= 100; cm++) {
+        const y = top + cm * PXM / 100, len = cm % 10 === 0 ? 18 : cm % 5 === 0 ? 12 : 7;
+        ctx.fillRect(194 - len, y - 0.5, len, 1);
+        if (cm % 10 === 0) ctx.fillText(String(cm), 172, y + 4);
+      }
+      const t = n / FPS, dt = Math.max(0, t - tRel);
+      const y = Math.min(y0 + 0.5 * 9.80 * PXM * dt * dt, floorY - R), x = 330;
+      ctx.fillStyle = "rgba(0,0,0,.18)"; ctx.beginPath(); ctx.ellipse(x, floorY + 3, R * (0.6 + 0.4 * (y - y0) / (floorY - R - y0)), 5, 0, 0, 7); ctx.fill();
+      const bg = ctx.createRadialGradient(x - 7, y - 8, 3, x, y, R);
+      bg.addColorStop(0, "#FF9A6B"); bg.addColorStop(1, "#B8341B");
+      ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(x, y, R, 0, 7); ctx.fill();
+    }
+  };
+}
+
+function makeProjectileDemo() {
+  // Simulated 120 fps clip of a ball launched at vx = 2.50 m/s, vy = 2.60 m/s. g = 9.80 m/s².
+  const W = 960, H = 540, FPS = 120, PXM = 400, x0 = 180, y0 = 330, R = 14, floorY = 470, tRel = 8.37 / FPS;
+  const VX = 2.5, VY = 2.6, drop = (floorY - R - y0) / PXM;
+  const tLand = (VY + Math.sqrt(VY * VY + 2 * 9.8 * drop)) / 9.8;
+  return {
+    width: W, height: H, frames: 100, fps: FPS, captureFps: FPS, motion: "projectile",
+    draw(ctx, n) {
+      const g = ctx.createLinearGradient(0, 0, 0, floorY);
+      g.addColorStop(0, "#CFCABD"); g.addColorStop(1, "#BDB6A8");
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, floorY);
+      ctx.fillStyle = "#6E6457"; ctx.fillRect(0, floorY, W, H - floorY);
+      ctx.fillStyle = "#5A5147"; ctx.fillRect(0, floorY, W, 4);
+      // meter stick on the wall
+      const sx = 180, sy = 60;
+      ctx.fillStyle = "#E3C35A"; ctx.fillRect(sx - 10, sy, PXM + 20, 32);
+      ctx.strokeStyle = "#8A6E1E"; ctx.lineWidth = 1; ctx.strokeRect(sx - 9.5, sy + 0.5, PXM + 19, 31);
+      ctx.fillStyle = "#2A2418"; ctx.font = "12px sans-serif"; ctx.textAlign = "center";
+      for (let cm = 0; cm <= 100; cm++) {
+        const x = sx + cm * PXM / 100, len = cm % 10 === 0 ? 14 : cm % 5 === 0 ? 9 : 5;
+        ctx.fillRect(x - 0.5, sy + 32 - len, 1, len);
+        if (cm % 10 === 0) ctx.fillText(String(cm), x, sy + 13);
+      }
+      // launch stand
+      ctx.fillStyle = "#7B8088"; ctx.fillRect(x0 - 4, y0 + R, 8, floorY - y0 - R);
+      ctx.fillRect(x0 - 16, y0 + R - 2, 32, 5);
+      // ball
+      const t = n / FPS, dt = Math.min(Math.max(0, t - tRel), tLand);
+      const x = x0 + VX * PXM * dt, y = y0 - (VY * dt - 4.9 * dt * dt) * PXM;
+      const h = (floorY - R - y) / (floorY - R - (y0 - VY * VY / 19.6 * PXM));
+      ctx.fillStyle = "rgba(0,0,0,.16)"; ctx.beginPath(); ctx.ellipse(x, floorY + 3, R * (1 - 0.4 * Math.max(0, Math.min(1, h))), 4, 0, 0, 7); ctx.fill();
+      const bg = ctx.createRadialGradient(x - 5, y - 5, 2, x, y, R);
+      bg.addColorStop(0, "#9FE07A"); bg.addColorStop(1, "#2E7D1F");
+      ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(x, y, R, 0, 7); ctx.fill();
+    }
+  };
+}
+
+/* ---------- Simulated toss ---------- */
+// A computer-drawn 60 fps clip of a 🫴 hand tossing an emoji straight up and catching it.
+// The camera is fixed, so the scale is known exactly and students skip the scale step.
+// The flight is pure free fall (g = 9.81 m/s², no air resistance).
+// The emoji pictures (Apple's) come from the "emoji" folder next to this page.
+// If a picture is missing, the device's own emoji is drawn instead.
+const EMOJI = { hand: "🫴", smile: "🙂", laugh: "😆", top: "😐" };
+const EMOJI_FILE = { hand: "palm_up_hand.png", smile: "slightly_smiling_face.png", laugh: "laughing.png", top: "neutral_face.png" };
+// Where the face rests on the hand picture, as fractions of its width and height (0,0 = top left).
+const HAND_PALM = { x: 0.64, y: 0.54 };
+// Sizes on screen, in video pixels. They are drawn larger than life so they are easy to see.
+const HAND_PX = 230, FACE_PX = 104;
+const FACE_FILL = 146 / 160;   // the face fills 146 of the 160 pixels across Apple's emoji picture
+// The part of the hand picture redrawn in front of the face (the thumb), as fractions of the picture.
+const THUMB_CLIP = [[0.30, 0.62], [0.36, 0.40], [0.47, 0.30], [0.55, 0.20], [0.66, 0.24], [0.64, 0.38], [0.56, 0.50], [0.50, 0.62]];
+const emojiImg = {}, emojiFallback = {};
+for (const k of Object.keys(EMOJI)) {
+  const img = new Image();
+  img.onload = () => { if (source && source.sim) { loupeSnapValid = false; showFrame(frame); } };
+  img.src = "emoji/" + EMOJI_FILE[k];
+  emojiImg[k] = img;
+}
+function emojiSprite(k) {
+  const img = emojiImg[k];
+  if (img && img.complete && img.naturalWidth) return img;
+  if (!emojiFallback[k]) {
+    const c = document.createElement("canvas"); c.width = c.height = 160;
+    const g = c.getContext("2d");
+    g.font = '136px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+    g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(EMOJI[k], 80, 88);
+    emojiFallback[k] = c;
+  }
+  return emojiFallback[k];
+}
+let tossBg = null;
+function makeTossSim(v0) {
+  const W = 900, H = 1600, FPS = 60, PPM = 240, G = 9.81, R = FACE_PX * FACE_FILL / 2 / PPM, SHUTTER = 1 / 1000, SUB = 3;
+  const X0 = W * 0.5;                        // where the ball rises, in pixels
+  const yRel = 1.05;                         // height of the ball's center at release (m above the bottom of the picture)
+  // The throw: a short dip, then the hand drives up through a stroke and lets go at speed v0.
+  const S = 0.1 + 0.01 * v0, F = 0.04 + 0.002 * v0, D = 0.12;
+  const Thold = 0.45, Tdip = 0.2 + 0.02 * v0, Tt = 2 * S / v0, Tf = 2 * F / v0;
+  const cRel = yRel - R, cHold = cRel - S + D, cTop = cRel + F;
+  const t1 = Thold, t2 = t1 + Tdip, t3 = t2 + Tt, t4 = t3 + Tf;
+  // The ball comes back down and is caught a little below the release height.
+  const drop = 0.03, tauC = (v0 + Math.sqrt(v0 * v0 + 2 * G * drop)) / G, tC = t3 + tauC, vC = v0 - G * tauC;
+  const cCatch = yRel - drop - R, lead = 0.06;
+  const Gc = 0.06 + 0.008 * Math.abs(vC), Tg = 2 * Gc / Math.abs(vC), tEnd = tC + Tg + 0.6;
+  const tApex = t3 + v0 / G;                 // the face goes neutral from 0.05 s before the top until 2 frames past 0.05 s after it
+  const ease = u => (1 - Math.cos(Math.PI * Math.max(0, Math.min(1, u)))) / 2;
+
+  // The clip starts 30 frames into the motion (the first 30 frames were trimmed off).
+  const SKIP = 30 / FPS;
+  const state = t => state0(t + SKIP);
+  function state0(t) {
+    let c, curl, by, th = 0;
+    if (t < t1) { c = cHold + 0.0015 * Math.sin(2 * Math.PI * 0.7 * t); curl = 1; }
+    else if (t < t2) { c = cHold - D * ease((t - t1) / Tdip); curl = 1; }
+    else if (t < t3) {
+      const u = t - t2;
+      c = cHold - D + v0 * (u / 2 - Tt / (2 * Math.PI) * Math.sin(Math.PI * u / Tt));
+      curl = 1 - 0.3 * ease((u / Tt - 0.7) / 0.3);
+    } else if (t < t4) { const u = t - t3, ad = v0 / Tf; c = cRel + v0 * u - ad * u * u / 2; curl = 0.7 - 0.55 * ease(u / 0.08); }
+    else if (t < tC) {
+      c = cTop + (cCatch - cTop) * ease((t - t4) / (tC - lead - t4));
+      curl = 0.15 + 0.2 * ease((t - (tC - 0.1)) / 0.1);
+    } else if (t < tC + Tg) {
+      const u = t - tC;
+      c = cCatch + vC * (u / 2 + Tg / (2 * Math.PI) * Math.sin(Math.PI * u / Tg));
+      curl = 0.35 + 0.65 * ease(u / 0.15);
+    } else { c = cCatch - Gc + 0.0015 * Math.sin(2 * Math.PI * 0.7 * (t - tC)); curl = 0.35 + 0.65 * ease((t - tC) / 0.15); }
+    let face, vy = 0, flying = false;
+    if (t < t3) { by = c + R; face = "smile"; }
+    else if (t < tC) { const u = t - t3; by = yRel + v0 * u - G * u * u / 2; vy = v0 - G * u; flying = true; face = (t >= tApex - 0.05 && t <= tApex + 0.05 + 2 / FPS) ? "top" : "laugh"; }
+    else { by = c + R; face = "smile"; }
+    return { c, by, face, vy, flying };
+  }
+  const px = ym => H - ym * PPM;
+
+  // ----- background: a painted block wall, drawn once -----
+  if (!tossBg || tossBg.width !== W) {
+    tossBg = document.createElement("canvas"); tossBg.width = W; tossBg.height = H;
+    const b = tossBg.getContext("2d");
+    const lg = b.createLinearGradient(0, 0, 0, H);
+    lg.addColorStop(0, "#DCD7CB"); lg.addColorStop(1, "#C9C3B5");
+    b.fillStyle = lg; b.fillRect(0, 0, W, H);
+    const bw = 0.397 * PPM, bh = 0.2 * PPM;
+    let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (let row = 0, y = H; y > -bh; row++, y -= bh) {
+      for (let x = row % 2 ? -bw / 2 : 0; x < W; x += bw) {
+        const v = (rnd() - 0.5) * 10;
+        b.fillStyle = `rgba(${v > 0 ? 255 : 0},${v > 0 ? 255 : 0},${v > 0 ? 255 : 0},${Math.abs(v) / 120})`;
+        b.fillRect(x + 3, y - bh + 3, bw - 6, bh - 6);
+        b.fillStyle = "rgba(90,82,68,.22)"; b.fillRect(x, y - bh, bw, 3); b.fillRect(x, y - bh, 3, bh);
+        b.fillStyle = "rgba(255,255,255,.18)"; b.fillRect(x + 3, y - bh + 3, bw - 3, 2);
+      }
+    }
+    // fine paint texture
+    const img = b.getImageData(0, 0, W, H), d = img.data;
+    for (let i = 0; i < d.length; i += 4) { const n = (rnd() - 0.5) * 9; d[i] += n; d[i + 1] += n; d[i + 2] += n; }
+    b.putImageData(img, 0, 0);
+    // a height scale painted on the wall: 0 m where the emoji's center leaves the hand
+    const sx = X0 - 250, zero = px(yRel), paint = "rgba(38,52,70,.82)";
+    b.fillStyle = paint; b.strokeStyle = paint; b.textAlign = "right"; b.textBaseline = "middle";
+    b.fillRect(sx - 1.5, px(H / PPM), 3, zero - px(H / PPM) + 0.5 * PPM);
+    for (let cm = -50; yRel + cm / 100 < H / PPM; cm += 10) {
+      const y = zero - cm / 100 * PPM, whole = cm % 100 === 0, half = cm % 50 === 0;
+      const len = whole ? 34 : half ? 22 : 11;
+      b.fillRect(sx, y - (whole ? 1.5 : 1), len, whole ? 3 : 2);
+      if (whole) {
+        b.font = "700 26px Lexend, sans-serif"; b.fillText(`${cm / 100} m`, sx - 10, y);
+        b.fillStyle = "rgba(38,52,70,.13)"; b.fillRect(sx + 34, y - 1, W - sx - 34, 2); b.fillStyle = paint;
+      } else if (half) { b.font = "600 18px Lexend, sans-serif"; b.fillText(`${cm / 100}`, sx - 10, y); }
+    }
+    // soft light from the upper left, darker corners
+    const rg = b.createRadialGradient(W * 0.35, H * 0.3, H * 0.1, W * 0.5, H * 0.5, H * 0.85);
+    rg.addColorStop(0, "rgba(255,250,235,.10)"); rg.addColorStop(1, "rgba(40,30,20,.28)");
+    b.fillStyle = rg; b.fillRect(0, 0, W, H);
+  }
+
+  const layer = document.createElement("canvas"), lc = layer.getContext("2d");
+  function drawLayer(t, ox, oy, w, h) {
+    // Hand and face on their own transparent layer, so the shadow on the wall is cast by both at once.
+    const s = state(t);
+    if (layer.width !== w || layer.height !== h) { layer.width = w; layer.height = h; } else lc.clearRect(0, 0, w, h);
+    const hs = HAND_PX, fs = FACE_PX, hx = X0 - ox - hs * HAND_PALM.x, hy = px(s.c) - oy - hs * HAND_PALM.y, hand = emojiSprite("hand");
+    lc.drawImage(hand, hx, hy, hs, hs);
+    lc.drawImage(emojiSprite(s.face), X0 - ox - fs / 2, px(s.by) - oy - fs / 2, fs, fs);
+    // redraw the thumb on top so the face looks like it sits in the hand
+    lc.save(); lc.beginPath();
+    THUMB_CLIP.forEach(([u, v], i) => i ? lc.lineTo(hx + u * hs, hy + v * hs) : lc.moveTo(hx + u * hs, hy + v * hs));
+    lc.closePath(); lc.clip(); lc.drawImage(hand, hx, hy, hs, hs); lc.restore();
+  }
+  // Region that can change between frames: a column around the ball and hand.
+  const colX = Math.floor(X0 - HAND_PX * 0.75), colW = Math.ceil(HAND_PX * 1.5 + 60);
+  const base = document.createElement("canvas"), bctx = base.getContext("2d");
+  const samp = document.createElement("canvas"), sctx2 = samp.getContext("2d");
+
+  return {
+    sim: "toss", v0, ppm: PPM, width: W, height: H, fps: FPS, captureFps: FPS, frames: Math.ceil((tEnd - SKIP) * FPS), motion: "fall",
+    draw(ctx, n) {
+      ctx.drawImage(tossBg, 0, 0);
+      const t = n / FPS;
+      // A real camera's shutter stays open for a moment, so fast motion blurs. Average several
+      // instants across the shutter time, but only when something is actually moving.
+      const a = state(t - SHUTTER / 2), z = state(t + SHUTTER / 2);
+      const moving = Math.max(Math.abs(a.c - z.c), Math.abs(a.by - z.by)) * PPM > 0.4;
+      const ts = moving ? Array.from({ length: SUB }, (_, i) => t + (i / (SUB - 1) - 0.5) * SHUTTER) : [t];
+      let top = H;
+      for (const s of [a, z]) top = Math.min(top, px(s.by) - FACE_PX / 2 - 40, px(s.c) - HAND_PX * HAND_PALM.y - 40);
+      top = Math.max(0, Math.floor(top)); const h = H - top;
+      // wall plus the soft shadow of the hand and ball (drawn once per frame)
+      if (base.width !== colW || base.height !== h) { base.width = colW; base.height = h; }
+      bctx.drawImage(tossBg, colX, top, colW, h, 0, 0, colW, h);
+      drawLayer(t, colX, top, colW, h);
+      bctx.save(); bctx.shadowColor = "rgba(30,20,10,.3)"; bctx.shadowBlur = 28; bctx.shadowOffsetX = 24; bctx.shadowOffsetY = 32;
+      bctx.globalCompositeOperation = "source-over";
+      // draw the layer far off-canvas so only its shadow lands on the wall
+      bctx.shadowOffsetX += 4 * colW; bctx.drawImage(layer, -4 * colW, 0); bctx.restore();
+      if (!moving) { ctx.drawImage(base, colX, top); ctx.drawImage(layer, colX, top); return; }
+      if (samp.width !== colW || samp.height !== h) { samp.width = colW; samp.height = h; }
+      ts.forEach((u, i) => {
+        drawLayer(u, colX, top, colW, h);
+        sctx2.drawImage(base, 0, 0); sctx2.drawImage(layer, 0, 0);
+        ctx.globalAlpha = 1 / (i + 1);   // running average of the instants
+        ctx.drawImage(samp, colX, top);
+      });
+      ctx.globalAlpha = 1;
+    },
+    state, tRelease: t3 - SKIP, tCatch: tC - SKIP, yRel,
+  };
+}
+
+let videoBlobUrl = null;
+async function makeVideo(cfg) {
+  // Download the whole clip first. Each frame step is then a local seek instead of
+  // a new request to the server, which removes most of the delay after a click.
+  let src = cfg.src;
+  try {
+    const r = await fetch(cfg.src);
+    if (!r.ok) throw new Error("http");
+    if (videoBlobUrl) URL.revokeObjectURL(videoBlobUrl);
+    videoBlobUrl = URL.createObjectURL(await r.blob());
+    src = videoBlobUrl;
+  } catch (e) { /* fall back to streaming from the server */ }
+  return new Promise((resolve, reject) => {
+    const v = document.createElement("video");
+    v.muted = true; v.playsInline = true; v.preload = "auto";
+    // The video itself is the picture students see. Chromebooks don't reliably update
+    // a hidden video after seeking, so it must be visible on the page.
+    $("wrap").querySelectorAll("video").forEach(x => x.remove());
+    $("wrap").insertBefore(v, overlay);
+    v.addEventListener("error", () => reject(new Error("load")), { once: true });
+    v.addEventListener("loadeddata", () => {
+      const fps = cfg.fps, frames = Math.max(1, Math.floor(v.duration * fps + 0.01));
+      resolve({
+        width: v.videoWidth, height: v.videoHeight, frames, fps, captureFps: cfg.captureFps || fps, motion: cfg.motion || "fall", el: v, scaleLength: +cfg.scaleLength || 1, tilt: +cfg.tilt || 0, depth: cfg.depth || null,
+        async draw(ctx, n) {
+          // Seek to the middle of frame n so we never land on a frame boundary.
+          const t = Math.min((n + 0.5) / fps, v.duration - 0.0005);
+          if (Math.abs(v.currentTime - t) > 1e-4) {
+            await new Promise(res => { v.addEventListener("seeked", res, { once: true }); v.currentTime = t; });
+            if (v.requestVideoFrameCallback) {
+              await Promise.race([new Promise(r => v.requestVideoFrameCallback(() => r())), new Promise(r => setTimeout(r, 80))]);
+            }
+          }
+        }
+      });
+    }, { once: true });
+    v.src = src;
+  });
+}
+
+async function loadSource(i) {
+  const token = ++loadToken, cfg = VIDEOS[i];
+  stopPlay();
+  marks.clear(); scale = { a: null, b: null }; frame = 0; source = null; fitState = null;
+  hideScaleConfirm();
+  $("stepSelect").value = "3";   // every click on Back/Next or a mark moves 3 frames
+  setMode("scale");
+  if (cfg.demo || cfg.sim) { $("stageMsg").hidden = true; $("wrap").hidden = false; }
+  else stageMessage("Loading video…");
+  try {
+    const s = cfg.sim ? makeTossSim(10) : cfg.demo === "fall" ? makeFallDemo() : cfg.demo === "projectile" ? makeProjectileDemo() : await makeVideo(cfg);
+    if (token !== loadToken) return;
+    source = s; loupeSnapValid = false;
+    $("stageMsg").hidden = true; $("wrap").hidden = false;
+    if (!s.el) $("wrap").querySelectorAll("video").forEach(x => x.remove());
+    frameCv.hidden = !!s.el;
+    if (s.el) s.el.classList.toggle("desat", mode === "viz");
+    frameCv.width = overlay.width = s.width; frameCv.height = overlay.height = s.height;
+    $("scrub").max = s.frames - 1; $("scrub").value = 0;
+    applyMotionLayout();
+    if (s.sim) setMode("mark");
+    await showFrame(0);
+    if (s.sim && !seen("sim") && $("tour").hidden) startTour([...TOURS.sim, ...TOURS.mark.slice(2)], "sim", "mark");
+  } catch (e) {
+    if (token !== loadToken) return;
+    $("wrap").hidden = true; $("stageMsg").hidden = false;
+    $("stageMsg").innerHTML = `Couldn't load <code>${cfg.src}</code>.<br><br>Check that the file name in videos.json matches the file in the bucket exactly, including capital letters.`;
+  }
+  updateAll();
+}
+
+function applyMotionLayout() {
+  const p = isProj(), sim = !!(source && source.sim);
+  document.querySelector(".page").classList.toggle("portrait", !!source && source.height > source.width);
+  document.querySelector(".page").classList.toggle("simvid", sim);
+  $("toolScale").hidden = sim; $("toolMark").textContent = sim ? "Mark emoji" : "2 · Mark ball";
+  $("vecBtn").hidden = !sim; if (showVec) setShowVec(false);
+  showPlayButton();
+  $("toolViz").hidden = !p;
+  const tilt = (source && source.tilt) || 0;
+  $("tiltNote").hidden = !tilt;
+  $("tiltNote").textContent = tilt ? `Camera tilt corrected: positions are turned ${Math.abs(tilt)}° ${tilt < 0 ? "clockwise" : "counterclockwise"} so x and y line up with true horizontal and vertical.` : "";
+  sizeHint();
+  $("vxBox").hidden = !p; $("fitTextX").hidden = !p;
+  $("gbX").hidden = !p; $("gbVX").hidden = !p;
+  $("graphYTitle").textContent = p ? "Vertical position vs. time" : "Position vs. time";
+  $("graphVYTitle").textContent = p ? "Vertical velocity vs. time" : "Velocity vs. time";
+  $("explainFall").hidden = p; $("explainProj").hidden = !p;
+  $("thead").innerHTML = p ? "<tr><th>Frame</th><th>t (s)</th><th>x (m)</th><th>y (m)</th></tr>" : "<tr><th>Frame</th><th>t (s)</th><th>y (m)</th></tr>";
+}
+
+/* ---------- Frame display ---------- */
+let busy = false, want = 0;
+async function showFrame(n) {
+  if (!source) return;
+  want = Math.max(0, Math.min(source.frames - 1, n));
+  frame = want; $("scrub").value = frame; updateFrameUI();
+  if (busy) return;
+  busy = true;
+  try {
+    while (true) {
+      const target = want;
+      await source.draw(fctx, target);
+      if (want === target) break;
+    }
+  } finally { busy = false; }
+  loupeSnapValid = false;
+  renderOverlay();
+  // refresh the magnifier so it shows the new frame without waiting for the mouse to move
+  if (!loupe.hidden && lastLoupe) safeLoupe(lastLoupe.e, lastLoupe.p);
+}
+const go = n => showFrame(n);
+const step = () => +$("stepSelect").value;
+
+/* ---------- Geometry helpers ---------- */
+const dist = (p, q) => Math.hypot(p.x - q.x, p.y - q.y);
+function k() { const w = overlay.getBoundingClientRect().width; return w ? overlay.width / w : 1; }
+function toNative(e) {
+  const r = overlay.getBoundingClientRect();
+  return { x: (e.clientX - r.left) * overlay.width / r.width, y: (e.clientY - r.top) * overlay.height / r.height };
+}
+// How far true vertical leans in the video, in degrees: negative = the top of a vertical object
+// leans left (counterclockwise), positive = right. Set per video with "tilt" in videos.json.
+// Depth correction for a ball that does not stay in the plane of the meter stick (set per video
+// with "depth" in videos.json). rate: fractional growth per second of the ball's apparent size
+// (it is moving toward the camera); refTime: video time the correction is anchored to;
+// planeScale: how much closer to the camera the ball's path is than the stick at refTime.
+// Positions are rescaled about the center of the picture, as a camera lens does.
+function depthK(T) { const d = source && source.depth; return d ? 1 / (1 + (d.rate || 0) * (T - (d.refTime || 0))) : 1; }
+function planeScale() { return (source && source.depth && source.depth.planeScale) || 1; }
+function depthCorrect(m, f) {
+  const k = depthK(f / source.captureFps), cx = overlay.width / 2, cy = overlay.height / 2;
+  return { x: cx + (m.x - cx) * k, y: cy + (m.y - cy) * k };
+}
+function tiltRad() { return ((source && source.tilt) || 0) * Math.PI / 180; }
+// Real length of the line students draw for the scale. 1 m unless videos.json gives "scaleLength" for this video.
+function scaleLength() { return (source && source.scaleLength) || 1; }
+function pxPerMeter() {
+  if (source && source.ppm) return source.ppm;   // simulated video: the scale is known exactly
+  const L = scaleLength();
+  if (!scale.a || !scale.b || !(L > 0)) return null;
+  const d = dist(scale.a, scale.b);
+  return d > 0 ? d / L : null;
+}
+
+/* ---------- Overlay drawing ---------- */
+function renderOverlay() {
+  const K = k();
+  octx.clearRect(0, 0, overlay.width, overlay.height);
+  if (mode === "viz") { if (fitState) drawViz(K); return; }
+  if (showVec) { drawTossVectors(K); return; }
+  const scaleCol = css("--scale"), markCol = css("--mark");
+  if (scale.a) {
+    const a = scale.a, b = scale.b;
+    octx.lineCap = "round";
+    if (b) {
+      const ang = Math.atan2(b.y - a.y, b.x - a.x), ux = Math.cos(ang), uy = Math.sin(ang), gap = 11 * K;
+      // the line stops short of each end so the exact point stays visible
+      if (dist(a, b) > 2 * gap) for (const [w, c] of [[4 * K, "rgba(0,0,0,.55)"], [2 * K, scaleCol]]) {
+        octx.strokeStyle = c; octx.lineWidth = w; octx.beginPath();
+        octx.moveTo(a.x + ux * gap, a.y + uy * gap); octx.lineTo(b.x - ux * gap, b.y - uy * gap);
+        octx.stroke();
+      }
+      const L = scaleLength();
+      const label = (L > 0 ? L.toFixed(2) : "?") + " m";
+      octx.font = `600 ${14 * K}px Lexend, sans-serif`;
+      const mx = (a.x + b.x) / 2 + 14 * K * Math.abs(Math.cos(ang)) * 0 + 14 * K, my = (a.y + b.y) / 2 + (Math.abs(Math.cos(ang)) > 0.7 ? 24 * K : 0);
+      octx.lineWidth = 4 * K; octx.strokeStyle = "rgba(0,0,0,.75)"; octx.strokeText(label, mx, my);
+      octx.fillStyle = scaleCol; octx.fillText(label, mx, my);
+    }
+    // Ends drawn as a hollow ring with four ticks: easy to spot, and the exact point in the middle stays clear.
+    for (const p of [a, b]) if (p) {
+      for (const [w, c] of [[4.5 * K, "rgba(0,0,0,.7)"], [2 * K, scaleCol]]) {
+        octx.strokeStyle = c; octx.lineWidth = w; octx.lineCap = "round";
+        octx.beginPath(); octx.arc(p.x, p.y, 9 * K, 0, 7);
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { octx.moveTo(p.x + dx * 13 * K, p.y + dy * 13 * K); octx.lineTo(p.x + dx * 20 * K, p.y + dy * 20 * K); }
+        octx.stroke();
+      }
+    }
+  }
+  for (const [f, p] of marks) {
+    const cur = f === frame;
+    octx.strokeStyle = "rgba(0,0,0,.7)"; octx.lineWidth = 1.5 * K; octx.fillStyle = markCol;
+    octx.globalAlpha = cur ? 1 : 0.75;
+    octx.beginPath(); octx.arc(p.x, p.y, (cur ? 4 : 3) * K, 0, 7); octx.fill(); octx.stroke();
+    if (cur) {
+      octx.strokeStyle = markCol; octx.lineWidth = 2 * K;
+      octx.beginPath(); octx.arc(p.x, p.y, 11 * K, 0, 7); octx.stroke();
+    }
+    octx.globalAlpha = 1;
+  }
+}
+
+function drawViz(K) {
+  // Draw everything in the tilt-corrected frame: origin at the first mark, axes turned by the
+  // video's tilt so "vertical" lines up with true vertical (the meter stick) in the picture.
+  // The map from corrected meters to the picture: undo the tilt, then undo the depth correction
+  // for the current frame, so the overlay lands on the ball as it appears now.
+  const a = tiltRad(), kc = depthK(frame / fitState.fps), C = { x: overlay.width / 2, y: overlay.height / 2 };
+  const q0 = depthCorrect(fitState.p0, fitState.f0);
+  octx.save();
+  octx.translate(C.x, C.y); octx.scale(1 / kc, 1 / kc); octx.translate(q0.x - C.x, q0.y - C.y); octx.rotate(a);
+  try { drawVizInner(K * kc, a, kc, q0, C); } finally { octx.restore(); }
+}
+function drawVizInner(K, a, kc, q0, C) {
+  const { fx, fy, f0, tLast, ts, fps } = fitState;
+  const ppm = fitState.ppm * planeScale(), p0 = { x: 0, y: 0 };
+  const W = overlay.width, H = overlay.height, s = 0.1 * ppm;
+  // find the area the grid must cover: the canvas corners in the corrected frame
+  const ca = Math.cos(a), sa = Math.sin(a);
+  const pts = [[0, 0], [W, 0], [0, H], [W, H]].map(([x, y]) => { const dx = (x - C.x) * kc + C.x - q0.x, dy = (y - C.y) * kc + C.y - q0.y; return [dx * ca + dy * sa, -dx * sa + dy * ca]; });
+  const minX = Math.min(...pts.map(q => q[0])), maxX = Math.max(...pts.map(q => q[0]));
+  const minY = Math.min(...pts.map(q => q[1])), maxY = Math.max(...pts.map(q => q[1]));
+  // 10 cm grid anchored at the origin (first mark)
+  octx.lineWidth = 1 * K;
+  for (let i = Math.floor(minX / s); i <= Math.ceil(maxX / s); i++) {
+    const x = i * s;
+    octx.strokeStyle = i === 0 ? "rgba(255,255,255,.85)" : i % 5 === 0 ? "rgba(255,255,255,.5)" : "rgba(255,255,255,.28)";
+    octx.lineWidth = (i === 0 ? 2 : 1) * K;
+    octx.beginPath(); octx.moveTo(x, minY); octx.lineTo(x, maxY); octx.stroke();
+  }
+  for (let j = Math.floor(minY / s); j <= Math.ceil(maxY / s); j++) {
+    const y = j * s;
+    octx.strokeStyle = j === 0 ? "rgba(255,255,255,.85)" : j % 5 === 0 ? "rgba(255,255,255,.5)" : "rgba(255,255,255,.28)";
+    octx.lineWidth = (j === 0 ? 2 : 1) * K;
+    octx.beginPath(); octx.moveTo(minX, y); octx.lineTo(maxX, y); octx.stroke();
+  }
+  const t = (frame - f0) / fps;
+  if (t < -1e-9) return;
+  const tc = Math.min(t, tLast);
+  const X = tt => p0.x + (fx.D * tt + fx.E) * ppm;
+  const Y = tt => p0.y - (fy.A * tt * tt + fy.B * tt + fy.C) * ppm;
+  const hcol = css("--hcol"), vcol = css("--vcol");
+  const shadowOn = () => { octx.shadowColor = "rgba(0,0,0,.55)"; octx.shadowBlur = 6 * K; octx.shadowOffsetX = 0; octx.shadowOffsetY = 2 * K; };
+  const shadowOff = () => { octx.shadowColor = "transparent"; octx.shadowBlur = 0; octx.shadowOffsetY = 0; };
+  // trail dots at the student's marked times: translucent fill, white outline, drop shadow
+  for (const ti of ts) {
+    if (ti > tc + 1e-9) break;
+    for (const [px, py, c] of [[X(ti), p0.y, hcol], [p0.x, Y(ti), vcol]]) {
+      shadowOn();
+      octx.globalAlpha = 0.55; octx.fillStyle = c;
+      octx.beginPath(); octx.arc(px, py, 6 * K, 0, 7); octx.fill();
+      shadowOff();
+      octx.globalAlpha = 0.9; octx.strokeStyle = "#fff"; octx.lineWidth = 1.5 * K;
+      octx.stroke();
+    }
+  }
+  octx.globalAlpha = 1;
+  const bx = X(tc), by = Y(tc);
+  // dashed guides from each circle to the ball
+  octx.setLineDash([5 * K, 4 * K]); octx.lineWidth = 1.5 * K; octx.strokeStyle = "rgba(255,255,255,.8)";
+  octx.beginPath(); octx.moveTo(bx, p0.y); octx.lineTo(bx, by); octx.moveTo(p0.x, by); octx.lineTo(bx, by); octx.stroke();
+  octx.setLineDash([]);
+  octx.strokeStyle = "rgba(255,255,255,.9)"; octx.lineWidth = 2 * K;
+  octx.beginPath(); octx.arc(bx, by, 5 * K, 0, 7); octx.stroke();
+  // the two tracking circles
+  for (const [px, py, c] of [[bx, p0.y, hcol], [p0.x, by, vcol]]) {
+    shadowOn();
+    octx.fillStyle = c; octx.beginPath(); octx.arc(px, py, 11 * K, 0, 7); octx.fill();
+    shadowOff();
+    octx.strokeStyle = "#fff"; octx.lineWidth = 2.5 * K; octx.stroke();
+  }
+  // Velocity and acceleration arrows, from the fitted equations.
+  // Lengths are tied to the grid: 1 square (10 cm) = 1 m/s for velocity, 5 m/s² for acceleration.
+  const vx = fx.D, vy = 2 * fy.A * tc + fy.B, ay = 2 * fy.A;
+  const vScale = 0.1 * ppm, aScale = 0.1 * ppm / 5;
+  if ($("showVel").checked) {
+    drawArrow(bx, p0.y, vx * vScale, 0, hcol, `${Math.abs(vx).toFixed(2)} m/s`, K);
+    drawArrow(p0.x, by, 0, -vy * vScale, vcol, `${Math.abs(vy).toFixed(2)} m/s`, K);
+    drawArrow(bx, by, vx * vScale, -vy * vScale, "#FFFFFF", `${Math.hypot(vx, vy).toFixed(2)} m/s`, K);
+  }
+  // acceleration label goes on the side away from the direction of travel, clear of the velocity arrows
+  if ($("showAcc").checked) drawArrow(bx, by, 0, -ay * aScale, css("--acol"), `${Math.abs(ay).toFixed(2)} m/s²`, K, vx >= 0 ? "left" : "right");
+}
+
+function drawArrow(x, y, dx, dy, color, label, K, side, opts = {}) {
+  const len = Math.hypot(dx, dy), start = opts.start != null ? opts.start : 12 * K;
+  let tipX = x, tipY = y;
+  if (len > start + 6 * K) {
+    // start the shaft at the edge of the circle so the arrow doesn't hide it
+    const ux = dx / len, uy = dy / len, head = Math.min(14 * K, len * 0.4);
+    const sx = x + ux * start, sy = y + uy * start;
+    tipX = x + dx; tipY = y + dy;
+    octx.shadowColor = "rgba(0,0,0,.6)"; octx.shadowBlur = 5 * K; octx.shadowOffsetY = 1.5 * K;
+    octx.strokeStyle = color; octx.fillStyle = color; octx.lineWidth = 3.5 * K; octx.lineCap = "round";
+    octx.beginPath(); octx.moveTo(sx, sy); octx.lineTo(tipX - ux * head * 0.8, tipY - uy * head * 0.8); octx.stroke();
+    octx.beginPath(); octx.moveTo(tipX, tipY);
+    octx.lineTo(tipX - ux * head - uy * head * 0.5, tipY - uy * head + ux * head * 0.5);
+    octx.lineTo(tipX - ux * head + uy * head * 0.5, tipY - uy * head - ux * head * 0.5);
+    octx.closePath(); octx.fill();
+    octx.shadowColor = "transparent"; octx.shadowBlur = 0; octx.shadowOffsetY = 0;
+  }
+  // value label beside the tip
+  octx.font = opts.font || `600 ${13 * K}px Lexend, sans-serif`;
+  let lx, ly;
+  if (Math.abs(dx) >= Math.abs(dy) && len > 1) { lx = tipX + Math.sign(dx) * 8 * K; ly = tipY - 12 * K; octx.textAlign = dx >= 0 ? "left" : "right"; }
+  else { const left = side === "left"; lx = tipX + (left ? -14 : 14) * K; ly = tipY + (len > 1 ? Math.sign(dy) * 4 * K : 0); octx.textAlign = left ? "right" : "left"; }
+  octx.textBaseline = "middle";
+  octx.lineJoin = "round"; octx.lineWidth = 4 * K; octx.strokeStyle = "rgba(0,0,0,.75)"; octx.strokeText(label, lx, ly);
+  octx.fillStyle = color === "#FFFFFF" ? "#FFFFFF" : color; octx.fillText(label, lx, ly);
+  octx.textAlign = "start"; octx.textBaseline = "alphabetic";
+}
+
+/* ---------- Vectors on the simulated toss ---------- */
+// Shown only while the emoji is in the air: velocity (blue) and acceleration (red), up is positive.
+let showVec = false;
+let simT = null;   // during slow motion: the in-between frame being shown (a fraction), so the motion stays smooth
+const V_PX = 22, A_PX = 12;   // arrow length in video pixels per m/s and per m/s²
+function drawTossVectors(K) {
+  if (!source || !source.sim) return;
+  const st = source.state((simT != null ? simT : frame) / source.fps);
+  if (!st.flying) return;
+  const cx = source.width * 0.5, cy = source.height - st.by * source.ppm, r = FACE_PX * FACE_FILL / 2;
+  const font = `600 ${15 * K}px Helvetica, Arial, sans-serif`, sign = v => (v > 0.005 ? "+" : v < -0.005 ? "−" : "");
+  // velocity: from the top or bottom edge of the emoji, depending on direction
+  const v = st.vy, vLen = Math.abs(v) * V_PX, vx = cx - 16;
+  if (vLen > 4) drawArrow(vx, cy, 0, -Math.sign(v) * (r + vLen), css("--vcol"), "", K, "left", { start: r, font });
+  // acceleration: always 9.81 m/s² down while in the air
+  drawArrow(cx + 16, cy, 0, r + 9.81 * A_PX, css("--acol"), "", K, "right", { start: r, font });
+  // values beside the emoji (up is positive)
+  const lines = [[`v = ${sign(v)}${Math.abs(v).toFixed(1)} m/s`, "#1C64C8"], ["a = −9.81 m/s²", "#C0182F"]];
+  octx.font = font; octx.textAlign = "left"; octx.textBaseline = "middle"; octx.lineJoin = "round";
+  const hb = $("helpBtn"), below = (hb.offsetTop + hb.offsetHeight + 24) * K;   // stay clear of the Help button
+  const midY = Math.max(cy, below);
+  lines.forEach(([t, c], i) => {
+    const lx = cx + r + 14 * K, ly = midY + (i ? 10 : -10) * K;
+    octx.lineWidth = 4 * K; octx.strokeStyle = "rgba(255,255,255,.92)"; octx.strokeText(t, lx, ly);
+    octx.fillStyle = c; octx.fillText(t, lx, ly);
+  });
+  octx.textAlign = "start"; octx.textBaseline = "alphabetic";
+}
+function setShowVec(on) {
+  showVec = on;
+  if (playing) stopPlay();
+  const b = $("vecBtn"); b.setAttribute("aria-pressed", String(on)); b.textContent = on ? "Hide vectors" : "Show vectors";
+  overlay.classList.toggle("viewing", on);
+  hideLoupe(); renderOverlay();
+}
+$("vecBtn").addEventListener("click", () => setShowVec(!showVec));
+
+/* ---------- Magnifier ---------- */
+const LOUPE_CSS = 290, ZOOM = 4;
+// The magnifier crops from a full-size snapshot of the current frame. Cropping straight from the
+// video element is unreliable in some browsers (the zoomed picture comes out shifted from the cursor).
+let loupeSnapCv = null, loupeSnapValid = false;
+function loupeSnap() {
+  const el = (source && source.el) || frameCv;
+  if (el === frameCv) return frameCv;
+  const W0 = overlay.width, H0 = overlay.height;
+  if (!loupeSnapCv) loupeSnapCv = document.createElement("canvas");
+  if (loupeSnapCv.width !== W0 || loupeSnapCv.height !== H0) { loupeSnapCv.width = W0; loupeSnapCv.height = H0; loupeSnapValid = false; }
+  if (!loupeSnapValid) { loupeSnapCv.getContext("2d").drawImage(el, 0, 0, W0, H0); loupeSnapValid = true; }
+  return loupeSnapCv;
+}
+function showLoupe(e, p) {
+  if (mode === "viz") return;
+  const r = overlay.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  const LS = Math.round(LOUPE_CSS * dpr);
+  if (loupe.width !== LS || loupe.height !== LS) { loupe.width = LS; loupe.height = LS; }
+  const s = r.width / overlay.width, src = LOUPE_CSS / (s * ZOOM), L = loupe.width;
+  lctx.imageSmoothingEnabled = false;
+  lctx.fillStyle = "#000"; lctx.fillRect(0, 0, L, L);
+  // Copy only the part of the picture that is inside the frame; some browsers throw an error
+  // when asked for an area that hangs off the edge.
+  const W0 = overlay.width, H0 = overlay.height;
+  const sx = Math.max(0, p.x - src / 2), sy = Math.max(0, p.y - src / 2);
+  const ex = Math.min(W0, p.x + src / 2), ey = Math.min(H0, p.y + src / 2);
+  if (ex > sx && ey > sy) {
+    const k2 = L / src, dx = (sx - (p.x - src / 2)) * k2, dy = (sy - (p.y - src / 2)) * k2, dw = (ex - sx) * k2, dh = (ey - sy) * k2;
+    try { lctx.drawImage(loupeSnap(), sx, sy, ex - sx, ey - sy, dx, dy, dw, dh); } catch (err) {}
+    try { lctx.drawImage(overlay, sx, sy, ex - sx, ey - sy, dx, dy, dw, dh); } catch (err) {}
+  }
+  lctx.strokeStyle = "rgba(255,255,255,.9)"; lctx.lineWidth = dpr;
+  lctx.beginPath(); lctx.moveTo(L / 2, L * 0.3); lctx.lineTo(L / 2, L * 0.7); lctx.moveTo(L * 0.3, L / 2); lctx.lineTo(L * 0.7, L / 2); lctx.stroke();
+  lctx.strokeStyle = "rgba(0,0,0,.6)"; lctx.strokeRect(L / 2 - 1.5 * dpr, L / 2 - 1.5 * dpr, 3 * dpr, 3 * dpr);
+  if (source && source.sim) {
+    // a circle the size of the emoji: line it up with the emoji, then click
+    const rr = FACE_PX * FACE_FILL / 2 * L / src;
+    for (const [w, c] of [[2 * dpr, "rgba(0,0,0,.35)"], [0.75 * dpr, "rgba(255,255,255,.95)"]]) {
+      lctx.lineWidth = w; lctx.strokeStyle = c; lctx.beginPath(); lctx.arc(L / 2, L / 2, rr, 0, 7); lctx.stroke();
+    }
+  }
+  // Up and to the right of the cursor; flip sides when that would leave the window.
+  let x = e.clientX - r.left + 28, y = e.clientY - r.top - LOUPE_CSS - 28;
+  if (r.left + x + LOUPE_CSS > innerWidth - 4) x = e.clientX - r.left - LOUPE_CSS - 28;
+  if (r.left + x < 4) x = 4 - r.left;
+  if (r.top + y < 4) y = e.clientY - r.top + 28;
+  loupe.style.left = x + "px"; loupe.style.top = y + "px"; loupe.hidden = false;
+}
+const hideLoupe = () => { loupe.hidden = true; };
+let lastLoupe = null;
+function safeLoupe(e, p) { lastLoupe = { e: { clientX: e.clientX, clientY: e.clientY }, p }; try { showLoupe(lastLoupe.e, p); } catch (err) { hideLoupe(); } }
+
+/* ---------- Pointer input ---------- */
+let pressing = false, drag = null;
+overlay.addEventListener("pointerdown", e => {
+  if (!source || mode === "viz" || showVec) return;
+  if (playing) stopPlay();
+  e.preventDefault(); overlay.setPointerCapture(e.pointerId);
+  const p = toNative(e), grab = 16 * k();
+  pressing = true; drag = null;
+  safeLoupe(e, p);
+});
+overlay.addEventListener("pointermove", e => {
+  if (!source || mode === "viz" || showVec) return;
+  const p = toNative(e);
+  if (drag) { scale[drag] = p; renderOverlay(); updateAll(); }
+  if (pressing || e.pointerType === "mouse") safeLoupe(e, p);
+});
+overlay.addEventListener("pointerup", e => {
+  if (!source || !pressing || mode === "viz" || showVec) return;
+  const p = toNative(e);
+  if (mode === "scale") {
+    const wasDone = !!(scale.a && scale.b);
+    // Clicking an existing end removes it; otherwise the click places the missing end.
+    const hit = 10 * k();
+    if (scale.b && dist(p, scale.b) < hit) scale.b = null;
+    else if (scale.a && dist(p, scale.a) < hit) { scale.a = scale.b; scale.b = null; }
+    else if (!scale.a) scale.a = p;
+    else if (!scale.b) scale.b = p;
+    if (scale.a && scale.b && !wasDone) showScaleConfirm(); else if (!(scale.a && scale.b)) hideScaleConfirm();
+  } else if (mode === "mark") {
+    // Clicking this frame's own mark removes it. Any other click places (or moves) this frame's mark and advances.
+    // Marks on other frames are never removed by a click, because early in the motion they sit right next to the ball.
+    const own = marks.get(frame);
+    if (own && dist(p, own) < 8 * k()) marks.delete(frame);
+    else {
+      marks.set(frame, p);
+      if (frame + step() <= source.frames - 1) go(frame + step());
+    }
+  }
+  pressing = false; drag = null;
+  // Draw the new point and update the instructions first, so nothing else can block them.
+  renderOverlay(); updateAll();
+  if (e.pointerType !== "mouse") hideLoupe(); else safeLoupe(e, p);
+});
+overlay.addEventListener("pointercancel", () => { pressing = false; drag = null; hideLoupe(); });
+overlay.addEventListener("pointerleave", () => { if (!pressing) hideLoupe(); });
+
+/* ---------- Analysis ---------- */
+function dataPoints() {
+  const ppm = pxPerMeter();
+  const fs = [...marks.keys()].sort((a, b) => a - b);
+  if (!fs.length) return [];
+  const f0 = fs[0], p0 = marks.get(f0), fps = source ? source.captureFps : 1;
+  // Turn each position by the video's tilt so x is truly horizontal and y truly vertical.
+  const a = tiltRad(), ca = Math.cos(a), sa = Math.sin(a), pp = ppm ? ppm * planeScale() : null;
+  const q0 = depthCorrect(p0, f0);
+  return fs.map(f => {
+    const m = depthCorrect(marks.get(f), f), dx = m.x - q0.x, dy = m.y - q0.y;
+    const cx = dx * ca + dy * sa, cy = -dx * sa + dy * ca;
+    return { f, t: (f - f0) / fps, x: pp ? cx / pp : null, y: pp ? -cy / pp : null };
+  });
+}
+function quadFit(pts) {
+  // least squares y = A t² + B t + C
+  let S = [0, 0, 0, 0, 0], T = [0, 0, 0];
+  for (const { t, y } of pts) {
+    let tp = 1;
+    for (let i = 0; i < 5; i++) { S[i] += tp; if (i < 3) T[i] += y * tp; tp *= t; }
+  }
+  const M = [[S[4], S[3], S[2], T[2]], [S[3], S[2], S[1], T[1]], [S[2], S[1], S[0], T[0]]];
+  for (let c = 0; c < 3; c++) {
+    let piv = c; for (let r = c + 1; r < 3; r++) if (Math.abs(M[r][c]) > Math.abs(M[piv][c])) piv = r;
+    [M[c], M[piv]] = [M[piv], M[c]];
+    if (Math.abs(M[c][c]) < 1e-14) return null;
+    for (let r = 0; r < 3; r++) if (r !== c) { const f = M[r][c] / M[c][c]; for (let j = c; j < 4; j++) M[r][j] -= f * M[c][j]; }
+  }
+  return { A: M[0][3] / M[0][0], B: M[1][3] / M[1][1], C: M[2][3] / M[2][2] };
+}
+function linFit(pts) {
+  // least squares x = D t + E
+  const n = pts.length; let st = 0, sx = 0, stt = 0, stx = 0;
+  for (const { t, x } of pts) { st += t; sx += x; stt += t * t; stx += t * x; }
+  const den = n * stt - st * st;
+  if (Math.abs(den) < 1e-14) return null;
+  const D = (n * stx - st * sx) / den;
+  return { D, E: (sx - D * st) / n };
+}
+
+/* ---------- UI updates ---------- */
+const fmt = (v, d) => (v < 0 ? "−" : "") + Math.abs(v).toFixed(d);
+const signed = (v, d) => (v < 0 ? "− " : "+ ") + Math.abs(v).toFixed(d);
+function setMode(m) {
+  mode = m;
+  if (m !== "scale") hideScaleConfirm();
+  stopPlay();
+  $("toolScale").setAttribute("aria-pressed", m === "scale");
+  $("toolMark").setAttribute("aria-pressed", m === "mark");
+  $("toolViz").setAttribute("aria-pressed", m === "viz");
+  frameCv.classList.toggle("desat", m === "viz");
+  if (source && source.el) source.el.classList.toggle("desat", m === "viz");
+  overlay.classList.toggle("viewing", m === "viz");
+  showPlayButton(); $("vizKey").hidden = m !== "viz";
+  hideLoupe();
+  renderOverlay(); updateAll();
+}
+const HINTS = {
+  scale1: "Click one end of the meter stick.",
+  scale2: "Click the other end.",
+  scale3: "To fix an end, click it to remove it, then click the right spot. Then choose Mark ball.",
+  viz: "Press Play or step through the frames. The orange circle follows the horizontal motion and the blue circle follows the vertical motion.",
+  noScale: "Set the scale first so positions can be measured in meters.",
+  sim1: "Press Play to watch the toss. Then step forward until the emoji has just left the hand. Line up the magnifier's circle with the emoji and click.",
+  simMark: "Line up the magnifier's circle with the emoji and click. The video advances after each click. To remove a mark, go back to its frame and click it. Stop before the hand catches it.",
+  mark1: "Don't mark the ball while it's being held. Step forward until it has been released, then click the top of the ball.",
+  mark: "Click the top of the ball. The video advances after each click. To remove a mark, go back to its frame and click it. Stop before the ball hits the floor or anything else.",
+};
+// The instructions sit above the video, so give the box a fixed height that fits the longest
+// instruction at the current width. Otherwise the video would shift when the text changes
+// and clicks would land in the wrong place.
+function sizeHint() {
+  const h = $("hint"), keep = h.textContent;
+  h.style.minHeight = "0px";
+  let max = 0;
+  for (const t of Object.values(HINTS)) { h.textContent = t; max = Math.max(max, Math.ceil(h.getBoundingClientRect().height)); }
+  h.textContent = keep; h.style.minHeight = max + "px";
+}
+addEventListener("resize", sizeHint);
+// Cheap updates that change with every frame step.
+function updateFrameUI() {
+  if (source) $("frameReadout").textContent = `Frame ${frame} / ${source.frames - 1} · ${fmt(frame / source.captureFps, 4)} s`;
+  else $("frameReadout").textContent = "No video";
+  const nav = !!source && mode !== "scale";
+  $("prev").disabled = !nav || frame <= 0;
+  $("next").disabled = !nav || !source || frame >= source.frames - 1;
+  $("scrub").disabled = !nav;
+  $("stepSelect").disabled = !nav || mode === "viz";
+  $("removeMark").disabled = !marks.has(frame) || mode === "viz";
+  // highlight the current frame's row, scrolling only inside the table (never the page)
+  const box = document.querySelector(".tablebox");
+  let cur = null;
+  for (const tr of $("tbody").children) { const on = +tr.dataset.f === frame; tr.classList.toggle("current", on); if (on) cur = tr; }
+  if (cur) {
+    const top = cur.offsetTop - box.querySelector("thead").offsetHeight, bottom = cur.offsetTop + cur.offsetHeight;
+    if (top < box.scrollTop) box.scrollTop = top;
+    else if (bottom > box.scrollTop + box.clientHeight) box.scrollTop = bottom - box.clientHeight;
+  }
+}
+function updateAll() {
+  const proj = isProj();
+  const ppm = pxPerMeter();
+  let hint;
+  if (mode === "scale") hint = !scale.a ? HINTS.scale1 : !scale.b ? HINTS.scale2 : HINTS.scale3;
+  else if (mode === "viz") hint = HINTS.viz;
+  else if (!ppm) hint = HINTS.noScale;
+  else if (!marks.size) hint = source && source.sim ? HINTS.sim1 : HINTS.mark1;
+  else hint = source && source.sim ? HINTS.simMark : HINTS.mark;
+  $("hint").textContent = hint;
+
+
+  // table
+  const pts = dataPoints();
+  $("countText").textContent = pts.length === 1 ? "1 point" : `${pts.length} points`;
+  const tb = $("tbody"); tb.replaceChildren();
+  for (const p of pts) {
+    const tr = document.createElement("tr");
+    tr.dataset.f = p.f;
+    const d = v => v === null ? "—" : fmt(v, 3);
+    tr.innerHTML = `<td>${p.f}</td><td>${fmt(p.t, 4)}</td>` + (proj ? `<td>${d(p.x)}</td>` : "") + `<td>${d(p.y)}</td>`;
+    tr.addEventListener("click", () => { if (mode !== "scale") go(p.f); });
+    tb.appendChild(tr);
+  }
+  updateFrameUI();
+
+  // fits
+  let fy = null, fx = null;
+  if (ppm && pts.length >= 3) { fy = quadFit(pts); if (proj) fx = linFit(pts); }
+  const fs = [...marks.keys()].sort((a, b) => a - b);
+  fitState = (fy && (!proj || fx)) ? { p0: marks.get(fs[0]), ppm, fx, fy, f0: fs[0], fLast: fs[fs.length - 1], tLast: pts[pts.length - 1].t, ts: pts.map(p => p.t), fps: source.captureFps } : null;
+  $("toolViz").disabled = !(proj && fitState);
+  if (mode === "viz" && !fitState) { setMode("mark"); return; }
+
+  if (fy) {
+    const a = 2 * fy.A;
+    $("gValue").innerHTML = `${Math.abs(a).toFixed(2)}<small>m/s²</small>`;
+    $("fitText").textContent = `y = ${fmt(fy.A, 3)} t² ${signed(fy.B, 3)} t ${signed(fy.C, 4)}   ·   g = |2A|`;
+    let yours = `<b>Your data:</b> `;
+    if (proj && fx) {
+      $("vxValue").innerHTML = `${fmt(fx.D, 2)}<small>m/s</small>`;
+      $("fitTextX").textContent = `x = ${fmt(fx.D, 3)} t ${signed(fx.E, 4)}   ·   vₓ = D`;
+      yours += `Horizontally, D = ${fmt(fx.D, 3)} m/s, so the ball moved sideways at a steady ${Math.abs(fx.D).toFixed(2)} m/s. Vertically, `;
+    }
+    yours += `A = ${fmt(fy.A, 3)} m/s², so a = 2 × (${fmt(fy.A, 3)}) = ${fmt(a, 2)} m/s². ` +
+      (a < 0 ? "The minus sign means the acceleration points down, because up is positive. " : "") +
+      `Its size is g = ${Math.abs(a).toFixed(2)} m/s². ` +
+      (proj ? `At your first mark the ball was moving ${fy.B >= 0 ? "upward" : "downward"} at ${Math.abs(fy.B).toFixed(2)} m/s.`
+            : `Your ball was moving at ${fmt(fy.B, 2)} m/s at your first mark.`);
+    $("explainYours").innerHTML = yours;
+  } else {
+    $("gValue").innerHTML = `—<small>m/s²</small>`;
+    $("vxValue").innerHTML = `—<small>m/s</small>`;
+    $("fitText").textContent = !ppm ? "Set the scale, then mark at least 3 frames." : "Mark at least 3 frames to fit a curve.";
+    $("fitTextX").textContent = "";
+    $("explainYours").textContent = "Once you've set the scale and marked at least 3 frames, your own numbers will appear here.";
+  }
+  const usable = ppm ? pts : [];
+  const tEnd = usable.length ? usable[usable.length - 1].t : null;
+  drawGraph($("graphY"), usable, "y", fy ? t => fy.A * t * t + fy.B * t + fy.C : null, "y (m)", css("--mark"));
+  // velocities between neighboring marks (central differences), plus the fitted line v = 2At + B
+  const vel = key => usable.slice(1, -1).map((p, i) => ({ t: p.t, v: (usable[i + 2][key] - usable[i][key]) / (usable[i + 2].t - usable[i].t) }));
+  drawGraph($("graphVY"), vel("y"), "v", fy ? t => 2 * fy.A * t + fy.B : null, proj ? "vᵧ (m/s)" : "v (m/s)", css("--mark"), tEnd);
+  $("capVY").textContent = fy ? `The slope of this line is the acceleration: ${fmt(2 * fy.A, 2)} m/s².` : "";
+  if (proj) {
+    drawGraph($("graphX"), usable, "x", fx ? t => fx.D * t + fx.E : null, "x (m)", css("--hcol"));
+    drawGraph($("graphVX"), vel("x"), "v", fx ? () => fx.D : null, "vₓ (m/s)", css("--hcol"), tEnd);
+    $("capVX").textContent = fx ? `A flat line means the horizontal velocity stays the same: ${fmt(fx.D, 2)} m/s.` : "";
+  }
+}
+
+/* ---------- Graphs ---------- */
+function niceTicks(lo, hi, n) {
+  const span = hi - lo || 1, raw = span / n, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const stepv = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= raw);
+  const out = []; for (let v = Math.ceil(lo / stepv) * stepv; v <= hi + 1e-9; v += stepv) out.push(+v.toFixed(10));
+  return out;
+}
+function drawGraph(cv, pts, key, fitFn, yLabel, dotCol, tMaxIn) {
+  const g = cv.getContext("2d");
+  const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+  if (!W) return;
+  cv.width = W * dpr; cv.height = H * dpr; g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, W, H);
+  const ink = css("--ink"), muted = css("--muted"), line = css("--line"), acc = css("--accent");
+  const pad = { l: 80, r: 14, t: 12, b: 44 };
+  let tMax = 0.5, vMin = -1, vMax = 0.1;
+  if (pts.length) {
+    tMax = tMaxIn || Math.max(...pts.map(p => p.t)) || 0.1;
+    const vals = pts.map(p => p[key]).concat(fitFn ? [fitFn(0), fitFn(tMax / 2), fitFn(tMax)] : []);
+    vMin = Math.min(0, ...vals); vMax = Math.max(0, ...vals);
+    const pd = (vMax - vMin) * 0.08 || 0.1; vMin -= pd; vMax += pd;
+  }
+  const X = t => pad.l + t / tMax * (W - pad.l - pad.r), Y = v => pad.t + (vMax - v) / (vMax - vMin) * (H - pad.t - pad.b);
+  g.font = "14px ui-monospace, Menlo, Consolas, monospace"; g.lineWidth = 1;
+  g.fillStyle = muted; g.strokeStyle = line;
+  g.textAlign = "right"; g.textBaseline = "middle";
+  for (const v of niceTicks(vMin, vMax, 5)) {
+    g.beginPath(); g.moveTo(pad.l, Y(v)); g.lineTo(W - pad.r, Y(v)); g.stroke();
+    g.fillText(fmt(v, Math.abs(v) < 1 && v !== 0 ? 2 : 1), pad.l - 6, Y(v));
+  }
+  g.textAlign = "center"; g.textBaseline = "top";
+  for (const v of niceTicks(0, tMax, 5)) g.fillText(v.toFixed(2), X(v), H - pad.b + 6);
+  g.fillStyle = ink; g.font = "500 16px Lexend, sans-serif";
+  g.fillText("t (s)", (pad.l + W - pad.r) / 2, H - 14);
+  g.save(); g.translate(16, (pad.t + H - pad.b) / 2); g.rotate(-Math.PI / 2); g.fillText(yLabel, 0, -6); g.restore();
+  g.strokeStyle = muted; g.beginPath(); g.moveTo(pad.l, pad.t); g.lineTo(pad.l, H - pad.b); g.lineTo(W - pad.r, H - pad.b); g.stroke();
+  if (fitFn) {
+    g.strokeStyle = acc; g.lineWidth = 2; g.beginPath();
+    for (let i = 0; i <= 60; i++) { const t = tMax * i / 60, v = fitFn(t); i ? g.lineTo(X(t), Y(v)) : g.moveTo(X(t), Y(v)); }
+    g.stroke();
+  }
+  g.fillStyle = dotCol;
+  for (const p of pts) { g.beginPath(); g.arc(X(p.t), Y(p[key]), 3.2, 0, 7); g.fill(); }
+  if (!pts.length) { g.fillStyle = muted; g.textAlign = "center"; g.textBaseline = "middle"; g.font = "16px Lexend, sans-serif"; g.fillText("Marked points will appear here", (pad.l + W) / 2, (pad.t + H - pad.b) / 2); }
+}
+
+/* ---------- Playback ---------- */
+// Play shows in Visualize mode, and always for the simulated video so students can watch it in real time.
+function showPlayButton() { $("play").hidden = !(mode === "viz" || (source && source.sim)); }
+function stopPlay() { playing = false; $("play").textContent = "Play"; }
+async function playRealTime() {
+  playing = true; $("play").textContent = "Pause";
+  const last = source.frames - 1, start = frame >= last ? 0 : frame, t0 = performance.now(), src = source;
+  while (playing && source === src) {
+    const rate = showVec ? 0.1 : 1;   // 1/10 speed while vectors are shown
+    const nf = start + (performance.now() - t0) / 1000 * source.fps * rate;
+    if (nf > last) { simT = null; await showFrame(last); break; }
+    if (showVec) {
+      // The simulation can be drawn at any instant, so slow motion shows the in-between moments
+      // instead of holding each frame. The frame counter shows the frame just passed.
+      simT = nf;
+      source.draw(fctx, nf);
+      const n = Math.floor(nf);
+      if (n !== frame) { frame = n; $("scrub").value = n; updateFrameUI(); }
+      renderOverlay();
+    } else {
+      const n = Math.floor(nf);
+      if (n !== frame) await showFrame(n);
+    }
+    await new Promise(r => requestAnimationFrame(r));
+  }
+  if (simT != null) { simT = null; await showFrame(frame); }   // land exactly on a frame when paused
+  stopPlay();
+}
+async function playLoop() {
+  if (mode !== "viz" && source && source.sim) return playRealTime();
+  if (!fitState) return;
+  playing = true; $("play").textContent = "Pause";
+  const { f0, fLast } = fitState;
+  if (frame < f0 || frame >= fLast) await showFrame(f0);
+  while (playing && frame < fLast) {
+    const t0 = performance.now();
+    await showFrame(frame + 1);
+    const wait = 70 - (performance.now() - t0);
+    if (wait > 0) await new Promise(r => setTimeout(r, wait));
+  }
+  stopPlay();
+}
+
+/* ---------- Controls ---------- */
+function addOption(v, i) { const o = document.createElement("option"); o.value = i; o.textContent = v.name; $("videoSelect").appendChild(o); }
+VIDEOS.forEach(addOption);
+function stageMessage(html) { $("wrap").hidden = true; $("stageMsg").hidden = false; $("stageMsg").innerHTML = html; }
+async function loadVideoList() {
+  if (!VIDEO_LIST_URL) return;
+  const listUrl = new URL(VIDEO_LIST_URL, location.href).href;
+  let list;
+  try {
+    const r = await fetch(listUrl, { cache: "no-store" });
+    if (!r.ok) throw new Error("http");
+    const text = await r.text();
+    try { list = JSON.parse(text); } catch (e) {
+      stageMessage("The video list (videos.json) has a typo, often a missing comma between videos or an extra comma after the last one.");
+      return;
+    }
+  } catch (e) {
+    stageMessage("Couldn't load the video list. Check your internet connection and reload the page.");
+    return;
+  }
+  for (const v of Array.isArray(list) ? list : []) {
+    const file = v.file || v.src;
+    if (!file || !v.fps) continue;
+    const entry = { ...v, name: v.name || file, src: new URL(file, listUrl).href };
+    VIDEOS.push(entry); addOption(entry, VIDEOS.length - 1);
+  }
+  if (!VIDEOS.length) stageMessage("No videos are listed in videos.json yet.");
+}
+$("videoSelect").addEventListener("change", e => loadSource(+e.target.value));
+$("toolScale").addEventListener("click", () => setMode("scale"));
+$("toolMark").addEventListener("click", () => { setMode("mark"); if (!seen("mark")) startTour(TOURS.mark, "mark"); });
+$("toolViz").addEventListener("click", () => { setMode("viz"); if (fitState && (frame < fitState.f0 || frame > fitState.fLast)) go(fitState.f0); if (!seen("viz")) startTour(TOURS.viz, "viz"); });
+$("play").addEventListener("click", () => { playing ? stopPlay() : playLoop(); });
+$("showVel").addEventListener("change", renderOverlay);
+$("showAcc").addEventListener("change", renderOverlay);
+$("prev").addEventListener("click", () => { stopPlay(); go(frame - (mode === "viz" ? 1 : step())); });
+$("next").addEventListener("click", () => { stopPlay(); go(frame + (mode === "viz" ? 1 : step())); });
+$("scrub").addEventListener("input", e => { stopPlay(); go(+e.target.value); });
+$("removeMark").addEventListener("click", () => { marks.delete(frame); renderOverlay(); updateAll(); });
+$("clearMarks").addEventListener("click", () => { marks.clear(); renderOverlay(); updateAll(); });
+$("copyData").addEventListener("click", () => {
+  const pts = dataPoints(), proj = isProj();
+  const text = (proj ? "frame\tt (s)\tx (m)\ty (m)\n" : "frame\tt (s)\ty (m)\n") +
+    pts.map(p => `${p.f}\t${p.t.toFixed(4)}` + (proj ? `\t${p.x === null ? "" : p.x.toFixed(4)}` : "") + `\t${p.y === null ? "" : p.y.toFixed(4)}`).join("\n");
+  const fb = () => { const ta = $("copyFallback"); ta.value = text; ta.hidden = false; ta.focus(); ta.select(); };
+  try {
+    navigator.clipboard.writeText(text).then(() => { $("copyData").textContent = "Copied"; setTimeout(() => $("copyData").textContent = "Copy data", 1500); }, fb);
+  } catch (e) { fb(); }
+});
+document.addEventListener("keydown", e => {
+  if (e.target.matches("input, select, textarea") || mode === "scale") return;
+  const s = mode === "viz" ? 1 : step();
+  if (e.key === "ArrowRight") { e.preventDefault(); stopPlay(); go(frame + s); }
+  if (e.key === "ArrowLeft") { e.preventDefault(); stopPlay(); go(frame - s); }
+});
+new ResizeObserver(() => { renderOverlay(); updateAll(); }).observe($("wrap"));
+new ResizeObserver(() => updateAll()).observe($("graphY"));
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { renderOverlay(); updateAll(); });
+new MutationObserver(() => { renderOverlay(); updateAll(); }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+/* ---------- Pop-up tutorials ---------- */
+const TOURS = {
+  intro: [
+    { el: "#controls", title: "Welcome", text: "This tool measures motion from a video. Work through these numbered steps in order. The box beside them always tells you what to do next. To switch videos, use the menu at the bottom right of the page." },
+    { el: "#transport", title: "Moving through the video", text: "Back and Next, below the video, move it forward or backward. You can also use the left and right arrow keys. The readout shows the frame number and the time." },
+    { el: "#stage", title: "Step 1: Set the scale", text: "Find the meter stick in the video. Click one end of it, then the other end. A magnifier appears while you aim. If you miss, click that end to remove it and click again. When both ends are in place, you'll be asked to confirm the scale." },
+  ],
+  mark: [
+    { el: "#transport", title: "Step 2: Find the release", text: "Use Next to step forward until the ball has just left the hand. Don't mark frames where the ball is still being held." },
+    { el: "#stage", title: "Mark the top of the ball", text: "Click the top of the ball. The video moves forward on its own after each click, so keep clicking the top of the ball in each new frame. Stop before the ball hits the floor or anything else." },
+    { el: "#dataCard", title: "Your data", text: "Each click adds a row here. Click a row to jump to that frame. To fix a mark, go to its frame and click the mark to remove it." },
+    { el: "#resultCard", title: "Your result", text: "Once you have at least 3 points, the app fits a curve to them and calculates g (and, for a throw, the horizontal velocity). Open “How is g found from my data?” to see how." },
+  ],
+  sim: [
+    { el: "#stage", title: "A simulated toss", text: "This video is a computer simulation of an emoji tossed straight up. The scale is already set for you, so you can go straight to marking." },
+    { el: "#play", title: "Watch it", text: "Press Play to watch the toss in real time. Then use Back and Next to step through it one frame at a time." },
+    { el: "#stage", title: "Mark the emoji", text: "Step forward until the emoji has just left the hand. Move the mouse over the emoji: the magnifier shows a circle the same size as the emoji. Line the circle up with the emoji and click. The video moves forward after each click, so keep doing this in each new frame. Stop before the hand catches it." },
+  ],
+  viz: [
+    { el: "#stage", title: "Step 3: Visualize", text: "The orange circle moves only sideways and the blue circle moves only up and down. The dashed lines from the two circles meet at the ball. Press Play to watch." },
+    { el: "#vizKey", title: "Arrows", text: "Turn the velocity and acceleration arrows on or off here. Arrow length uses the grid: 1 square is 1 m/s for velocity and 5 m/s² for acceleration." },
+  ],
+};
+function seen(k) { try { return localStorage.getItem("fft-tour-" + k) === "1"; } catch (e) { return false; } }
+function markSeen(k) { try { localStorage.setItem("fft-tour-" + k, "1"); } catch (e) {} }
+let tourSteps = null, tourIdx = 0, tourKeys = [], tourEl = null;
+function startTour(steps, ...keys) {
+  tourSteps = steps.filter(st => { const el = document.querySelector(st.el); return el && !el.closest("[hidden]"); });
+  if (!tourSteps.length) return;
+  tourKeys = keys; tourIdx = 0; $("tour").hidden = false; showTourStep();
+}
+function endTour() {
+  if (tourEl) tourEl.classList.remove("tour-target");
+  tourEl = null; $("tour").hidden = true; tourKeys.forEach(markSeen); tourSteps = null;
+  $("stage").scrollIntoView({ block: "nearest" });
+}
+function showTourStep() {
+  const st = tourSteps[tourIdx];
+  if (tourEl) tourEl.classList.remove("tour-target");
+  tourEl = document.querySelector(st.el);
+  tourEl.classList.add("tour-target");
+  tourEl.scrollIntoView({ block: "nearest" });
+  $("tourCount").textContent = `${tourIdx + 1} of ${tourSteps.length}`;
+  $("tourTitle").textContent = st.title; $("tourText").textContent = st.text;
+  $("tourBack").hidden = tourIdx === 0;
+  $("tourNext").textContent = tourIdx === tourSteps.length - 1 ? "Got it" : "Next";
+  requestAnimationFrame(placeTour);
+  $("tourNext").focus({ preventScroll: true });
+}
+function placeTour() {
+  if (!tourEl || $("tour").hidden) return;
+  const card = $("tour"), r = tourEl.getBoundingClientRect(), W = innerWidth, H = innerHeight, cw = card.offsetWidth, ch = card.offsetHeight, m = 12;
+  let top, left = r.left + r.width / 2 - cw / 2;
+  if (r.height > H * 0.55) { top = Math.min(r.bottom, H) - ch - 16; left = W - r.right >= cw + 2 * m ? r.right + m : r.left + 16; }  // video area: lower-left corner, away from the middle
+  else if (H - r.bottom >= ch + m) top = r.bottom + m;                     // below
+  else if (r.top >= ch + m) top = r.top - ch - m;                          // above
+  else top = H - ch - 16;
+  left = Math.max(m, Math.min(W - cw - m, left));
+  card.style.top = Math.max(m, top) + "px"; card.style.left = left + "px";
+}
+$("tourNext").addEventListener("click", () => { if (tourIdx < tourSteps.length - 1) { tourIdx++; showTourStep(); } else endTour(); });
+$("tourBack").addEventListener("click", () => { if (tourIdx > 0) { tourIdx--; showTourStep(); } });
+$("tourSkip").addEventListener("click", endTour);
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("tour").hidden) endTour(); });
+addEventListener("resize", placeTour); addEventListener("scroll", placeTour, { passive: true });
+/* ---------- Scale confirmation ---------- */
+// Shown when both ends of the scale are placed. Accepting goes straight to marking the ball.
+const MARK_START = { el: "#stage", title: "Step 2: Find where the ball starts to fall", text: "Use Next (or the right arrow key) to step forward until the ball has just left the hand and is starting to fall. Don't mark frames where it's still being held. Then click the top of the ball. The video moves forward after each click, so keep clicking the top of the ball in each new frame. Stop before the ball hits the floor or anything else." };
+function showScaleConfirm() {
+  const L = scaleLength();
+  $("scaleConfirmText").textContent = `The two ends you clicked will count as ${L > 0 ? L.toFixed(2) : "1.00"} m. Check that each ring sits exactly on an end of the meter stick.`;
+  $("scaleConfirm").hidden = false;
+  requestAnimationFrame(placeScaleConfirm);
+  $("scaleAccept").focus({ preventScroll: true });
+}
+function hideScaleConfirm() { $("scaleConfirm").hidden = true; }
+function placeScaleConfirm() {
+  const card = $("scaleConfirm");
+  if (card.hidden) return;
+  const r = $("stage").getBoundingClientRect(), H = innerHeight, W = innerWidth, m = 12;
+  const top = Math.max(m, Math.min(r.bottom, H) - card.offsetHeight - 16);
+  const left = W - r.right >= card.offsetWidth + 2 * m ? r.right + m : Math.max(m, Math.min(W - card.offsetWidth - m, r.left + 16));
+  card.style.top = top + "px"; card.style.left = left + "px";
+}
+addEventListener("resize", placeScaleConfirm); addEventListener("scroll", placeScaleConfirm, { passive: true });
+$("scaleRedo").addEventListener("click", () => { hideScaleConfirm(); scale = { a: null, b: null }; renderOverlay(); updateAll(); });
+$("scaleAccept").addEventListener("click", () => {
+  hideScaleConfirm();
+  setMode("mark");
+  // Every time: how to find the start of the fall. First time only: where the data and result appear.
+  startTour([MARK_START, ...(seen("mark") ? [] : TOURS.mark.slice(2))], "mark");
+});
+
+$("helpBtn").addEventListener("click", () => {
+  if (source && source.sim) { startTour([...TOURS.sim, ...TOURS.mark.slice(2)], "sim", "mark"); return; }
+  const steps = [...TOURS.intro, ...TOURS.mark, ...(isProj() ? TOURS.viz : [])];
+  startTour(steps, "intro", "mark");
+});
+
+sizeHint();
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { sizeHint(); updateAll(); });
+// Start: load the video list, then open the first video.
+(async () => {
+  if (VIDEOS.length) loadSource(0);
+  else stageMessage("Loading videos…");
+  const had = VIDEOS.length;
+  await loadVideoList();
+  // The simulated toss is built in, so it is always last in the menu.
+  const simEntry = { name: "Emoji toss (simulated)", sim: "toss", step: 2 };
+  VIDEOS.push(simEntry); addOption(simEntry, VIDEOS.length - 1);
+  if (!had && VIDEOS.length) { $("videoSelect").value = "0"; await loadSource(0); }
+  if (VIDEOS.length && !seen("intro")) startTour(TOURS.intro, "intro");
+})();
+</script>
