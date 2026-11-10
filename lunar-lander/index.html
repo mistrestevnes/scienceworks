@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>Lunar Lander</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=JetBrains+Mono:wght@200&display=swap">
@@ -137,6 +137,39 @@ button.primary { border-width: 2.5px; }
 }
 .warning.off { visibility: hidden; }
 
+.devpanel {
+  position: absolute; top: 14px; right: 14px; bottom: 14px; width: 330px; overflow-y: auto; z-index: 20;
+  border: 1.5px solid var(--line); background: var(--bg); padding: 10px 12px; font-size: 13px; display: grid; gap: 8px; align-content: start;
+}
+.devpanel h3 { margin: 4px 0 0; font-size: 14px; font-weight: 400; border-bottom: 1px solid #555; padding-bottom: 2px; }
+.devpanel .grid { display: grid; grid-template-columns: 1fr 80px; gap: 3px 8px; align-items: center; }
+.devpanel input[type=number] { width: 80px; background: #000; color: #fff; border: 1px solid #777; font: inherit; padding: 2px 4px; }
+.devpanel label.ck { display: inline-flex; gap: 4px; align-items: center; margin-right: 8px; }
+.devpanel button { font-size: 13px; min-height: 28px; padding: 3px 8px; }
+.devpanel textarea { width: 100%; height: 90px; background: #000; color: #fff; border: 1px solid #777; font: 12px monospace; }
+.devpanel .hint { color: #aaa; }
+/* ---------- touch mode: on-screen buttons for tablets ---------- */
+.touchpad { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
+.touchpad button {
+  position: absolute; pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+  width: 78px; height: 78px; font-size: 30px; padding: 0; line-height: 1;
+  background: rgba(0, 0, 0, .45); border: 2px solid rgba(255, 255, 255, .75); color: #FFFFFF;
+}
+.touchpad button.down { background: #FFFFFF; color: #000000; }
+.touchpad #tL { left: 22px; bottom: 22px; }
+.touchpad #tR { left: 112px; bottom: 22px; }
+.touchpad #tFire { right: 22px; bottom: 22px; width: 128px; height: 108px; font-size: 22px; }
+.touchpad #tUp { right: 160px; bottom: 76px; width: 64px; height: 54px; font-size: 26px; }
+.touchpad #tDn { right: 160px; bottom: 16px; width: 64px; height: 54px; font-size: 26px; }
+.touchpad #tPause { left: 50%; transform: translateX(-50%); bottom: 16px; width: 64px; height: 54px; font-size: 20px; }
+.app.touch .stage { touch-action: none; user-select: none; -webkit-user-select: none; }
+.app.touch .minimap { bottom: 118px; }
+.app.touch .altbig { bottom: 148px; }
+.app.touch .warning { bottom: 82px; }
+.rotate {
+  position: fixed; inset: 0; z-index: 50; background: #000000; color: #FFFFFF; display: grid; place-items: center;
+  font-size: 24px; text-align: center; padding: 24px;
+}
 @media (max-width: 820px) { body { overflow: auto; } .app { height: auto; } .stage { height: 62vh; } }
 </style>
 
@@ -170,6 +203,13 @@ button.primary { border-width: 2.5px; }
     </div>
     <div class="warning off" id="warn" role="status">Altitude warning: too fast</div>
 
+    <div class="touchpad" id="touchpad" hidden>
+      <button id="tL" aria-label="Rotate left">◀</button><button id="tR" aria-label="Rotate right">▶</button>
+      <button id="tUp" aria-label="Throttle up">+</button><button id="tDn" aria-label="Throttle down">−</button>
+      <button id="tFire" aria-label="Fire engine (hold)">FIRE</button>
+      <button id="tPause" aria-label="Pause">❚❚</button>
+    </div>
+    <div class="devpanel" id="dev" hidden aria-label="Dev panel"></div>
     <div class="panel overlay" id="overlay">
       <h2 id="ovTitle">Lunar Lander</h2>
       <p id="ovGoal"></p>
@@ -193,7 +233,8 @@ button.primary { border-width: 2.5px; }
           <button data-practice="0">Plateau</button><button data-practice="1">Ravine</button><button data-practice="2">Mountain</button><button data-practice="3">Ledge</button><button data-practice="4">Crater</button>
         </div>
         <div class="btnrow"><span class="lbl">Educational mode:</span><button id="bEdu" aria-pressed="false">Off</button>
-          <span class="lbl" style="margin-left:14px">Velocity components (V):</span><button id="bComp" aria-pressed="false">Off</button></div>
+          <span class="lbl" style="margin-left:14px">Velocity components (V):</span><button id="bComp" aria-pressed="false">Off</button>
+          <span class="lbl" style="margin-left:14px">Touch controls:</span><button id="bTouch" aria-pressed="false">Off</button></div>
         <div class="btnrow" id="eduOpts" hidden>
           <span class="lbl">World:</span><button data-world="Moon" aria-pressed="true">Moon</button><button data-world="Mars" aria-pressed="false">Mars</button><button data-world="Ceres" aria-pressed="false">Ceres</button>
           <span class="lbl" style="margin-left:10px">Mass:</span><button id="bMass" aria-pressed="false">Constant</button>
@@ -207,27 +248,37 @@ button.primary { border-width: 2.5px; }
   </div>
 
 </div>
+<div class="rotate" id="rotateMsg" hidden>Turn your tablet sideways to play.</div>
 
 <script>
 (() => {
+  // ---------- tunable settings (the dev panel edits these; press ` to open it) ----------
+  const CFG_DEFAULT = {
+    grav: 1.62, thrust: 94000, burnS: 360, rot: 50.4, rotUp: 63,
+    cleanVy: 1.5, cleanVx: 0.75, shockBonus: 0.5, dmgPerTenth: 1, snapV: 6,
+    tiltClean: 5, tiltDmg: 3, tiltSnap: 10, tiltCrash: 20,
+    hull: 60, legLossAt: 30, faultEvery: 20,
+    repairFrac: 0.2, repairTime: 30, economy: 0.8, poorFuel: 1.15,
+    engDmgPower: 0.8, engDmgFuel: 0.9, cutsPerMin: [5, 8], deadPerMin: 8,
+    runV: 2.0, limpV: 0.9, hopV: 1.3, boardFF: 3,
+    siteW: [120, 110, 100, 70, 55]
+  };
+  let CFG = JSON.parse(JSON.stringify(CFG_DEFAULT));
+  try { const saved = JSON.parse(localStorage.getItem('llDevCfg') || 'null'); if (saved) Object.assign(CFG, saved); } catch (e) {}
+
   // ---------- physics (SI units) ----------
-  const WORLDS = { Moon: 1.62, Mars: 3.71, Ceres: 0.28 };   // surface gravity, m/s/s
+  const WORLDS = { Moon: CFG.grav, Mars: 3.71, Ceres: 0.28 };   // surface gravity, m/s/s
   const MASS = 15000;             // kg, ship with a full tank (held constant unless "Mass: changes" is on)
   const DRY_MASS = 6800;          // kg, ship with an empty tank (used only when mass changes)
   const PROP_MASS = MASS - DRY_MASS;
-  const MAX_THRUST = 94000;       // N, the one engine at 100% throttle
   const START_THROTTLE = 0.5;
-  const FULL_BURN_S = 360;        // seconds a full tank lasts at 100% throttle on the Moon
-  const ROT_RATE = 50.4;          // degrees per second while an arrow key is held; the faster-turning upgrade gives 63
-  const MAX_TILT = 10;            // degrees from upright allowed at touchdown
-  // touchdown: up to 2.0 m/s (down or sideways) is clean; every full 0.1 m/s over that does 1 damage, so damage
-  // starts at 2.1 m/s (down and sideways counted separately and added); over 6.0 m/s either way also snaps a leg
-  const SAFE_V0 = 2.0, SNAP_V = 6.0;   // the shock-absorber upgrade raises the clean limit to 2.5 m/s
-  const HULL_MAX = 60, LEG_LOSS_AT = 30;   // hull points (hull plating adds 20); a leg also breaks once 30 damage has built up
+  // touchdown (all numbers in CFG): clean up to 1.5 m/s down and 0.75 m/s sideways (shock absorbers +0.5 each);
+  // every full 0.1 m/s over a limit does 1 damage (down and sideways added); over 6 m/s either way snaps a leg.
+  // Tilt: clean up to 5 degrees, then 3 damage per whole degree over; 10 degrees or more snaps a leg; over 20 is a crash.
   // ---------- upgrades: the minimap from the first team picked up, then one random upgrade from each later team
   const UPGRADES = {
     path: 'trajectory path', turning: 'faster turning (+25%)', economy: 'better fuel economy (20% less fuel)',
-    shocks: 'shock absorbers (clean landings up to 2.5 m/s)', plating: 'hull plating (+20 hull, 10 repaired)'
+    shocks: 'shock absorbers (clean landing limits +0.5 m/s)', repair: 'crew repairs (20% of the damage, over 30 s)'
   };
   const ZOOM_IN_ALT = 40, ZOOM_OUT_ALT = 50;   // below 40 m above the surface: close view (landing view when descending); out above 50 m
   const CLOSE_H = 120;            // metres shown top to bottom in the close view
@@ -269,11 +320,18 @@ button.primary { border-width: 2.5px; }
   const CONTROL = [
     [0,  270], [240,  200], [360,  200], [1541,  234], [1788,  502], [2162,  801], [2247,  830], [2353,  787], [2671,  590], [2953,  350], [3660,  420], [3810,  420], [4680,  470], [4996,  430], [5171,  534], [5436,  647], [5496,  660], [5571,  640], [5796,  488], [5996,  316], [6150,  300], [6600,  250], [6810,  130], [6990,  30], [7140,  30], [7590,  150], [7830,  280], [8198,  311], [8445,  602], [8820,  930], [8905,  958], [9011,  916], [9329,  728], [9612,  498], [10140,  620], [10620,  760], [10770,  760], [11280,  700], [11789,  539], [11999,  679], [12316,  831], [12388,  849], [12477,  821], [12747,  612], [12986,  374], [13500,  340], [14250,  290], [14700,  380], [14850,  380], [15256,  540], [15390,  660], [16050,  600], [16362,  551], [16530,  628], [16785,  711], [16843,  721], [16915,  706], [17131,  569], [17323,  417], [18000,  340], [18900,  280], [19320,  330], [19560,  220], [19740,  120], [19890,  120], [20370,  230], [20640,  330], [21300,  290], [22350,  230], [23250,  180], [24000,  230]
   ];
+  // landing-site lengths (CFG.siteW): the end with the shelter stays put, the other end moves
+  SITES.forEach((t, i) => {
+    const w = CFG.siteW[i]; if (!w) return;
+    const oldEnd = t.side === 'left' ? t.x2 : t.x1, newEnd = t.side === 'left' ? t.x1 + w : t.x2 - w;
+    for (const c of CONTROL) if (c[0] === oldEnd) c[0] = newEnd;
+    if (t.side === 'left') t.x2 = newEnd; else t.x1 = newEnd;
+  });
   // Stops 10% closer together: the distance between the centres of each pair of neighbouring stops (base
   // included) shrinks by 10%. Only the ground between them is squeezed; each landing site stays 150 m wide and
   // the stretch past the last shelter keeps its length. Heights are unchanged.
   {
-    const flats = [BASE, ...SITES], oldK = [0], newK = [0];
+    const flats = [BASE, ...SITES], oldK = [0], newK = [0];   // (each site keeps its own length)
     let shift = 0;
     flats.forEach((f, i) => {
       if (i > 0) { const p = flats[i - 1]; shift += 0.1 * (((f.x1 + f.x2) - (p.x1 + p.x2)) / 2); }
@@ -391,8 +449,8 @@ button.primary { border-width: 2.5px; }
   }
   // two layers: far (moves at 25% of the foreground's speed across the screen) and near (50%)
   const BG_DEPTHS = [
-    { p: 0.25, alpha: 0.35, w: 0.6,  hMin: 50, hMax: 130, gap: [450, 900] },
-    { p: 0.5,  alpha: 0.6,  w: 0.75, hMin: 25, hMax: 75,  gap: [300, 650] }
+    { p: 0.25, alpha: 0.35, w: 0.6,  hMin: 22, hMax: 60, gap: [450, 900] },
+    { p: 0.5,  alpha: 0.6,  w: 0.75, hMin: 12, hMax: 35, gap: [300, 650] }
   ];
   // The background mountains (and the stars after them) use their own fixed starting point in the random
   // sequence, and are generated over the original 24 km length, so changes to the ground never reshuffle them.
@@ -403,7 +461,8 @@ button.primary { border-width: 2.5px; }
     for (let x = -2500; x < 24000 * D.p + 4000; x += D.gap[0] + rnd() * (D.gap[1] - D.gap[0])) {
       // varied sizes: about one in five is a big one (up to twice the usual height), and the width-to-height
       // ratio varies from steep peaks to broad, low massifs
-      const big = rnd() < 0.2 ? 1.5 + rnd() * 0.5 : 1;
+      // sizes vary widely: about one in five is big (1.6-2.4x), one in four small (0.4-0.7x), the rest in between
+      const rs = rnd(), big = rs < 0.2 ? 1.6 + rnd() * 0.8 : rs < 0.45 ? 0.4 + rnd() * 0.3 : 0.8 + rnd() * 0.4;
       const h = (D.hMin + rnd() * (D.hMax - D.hMin)) * big, w = h * (1.8 + rnd() * 2.6);
       D.m.push({ x, w, shape: mountainShape(w, h) });
     }
@@ -476,7 +535,7 @@ button.primary { border-width: 2.5px; }
   let grav = WORLDS.Moon;
 
   // fuel lasts longer on stronger-gravity worlds so a mission stays possible
-  const fuelPerN = () => 100 / (FULL_BURN_S * Math.sqrt(Math.max(1, grav / WORLDS.Moon))) / MAX_THRUST;
+  const fuelPerN = () => 100 / (CFG.burnS * Math.sqrt(Math.max(1, grav / WORLDS.Moon))) / CFG.thrust;
   const shipMass = () => settings.varMass ? DRY_MASS + PROP_MASS * game.fuel / 100 : MASS;
 
   function setup(mode, practiceIdx) {
@@ -485,7 +544,7 @@ button.primary { border-width: 2.5px; }
       mode, practiceIdx, state: 'landed', paused: false, time: 0, fuel: 100, main: false,
       throttle: START_THROTTLE, score: 0, tally: { safe: 0, injured: 0, killed: 0 }, picked: new Set(),
       log: [], logT: 0, wHeld: false, cp: null,
-      hull: HULL_MAX, hullMax: HULL_MAX, dmgTotal: 0, upg: new Set(), legGone: 0,   // legGone: -1 left front leg broken, +1 right, 0 none
+      hull: CFG.hull, hullMax: CFG.hull, dmgTotal: 0, upg: new Set(), legGone: 0,   // legGone: -1 left front leg broken, +1 right, 0 none
       faults: { handling: 0, fuel: 0, misfire: 0, life: 0, coolant: 0 }, lifeLeft: null,
       heat: 0, overheat: false, misfireT: 0, topple: null
     };
@@ -528,9 +587,9 @@ button.primary { border-width: 2.5px; }
     $('overlay').hidden = false;
   }
   function refreshGoal() {
-    $('ovGoal').textContent = 'Pick up all five teams, then land back at base. Land on the flat ground beside each shelter, upright to within 10°. Touching down faster than 2 m/s, down or sideways, damages the ship, and faster than 6 m/s breaks a leg. Landing closer than 30 m to a shelter hurts the people inside.';
+    $('ovGoal').textContent = 'Pick up all five teams, then land back at base. Land on the flat ground beside each shelter. Touching down faster than 1.5 m/s down or 0.75 m/s sideways, or tilted more than 5°, damages the ship; faster than 6 m/s or tilted 10° or more breaks a leg; over 20° is a crash. Landing closer than 30 m to a shelter hurts the people inside.';
     $('ovHover').hidden = !settings.edu || game.state !== 'intro';
-    $('ovHover').textContent = `Before you fly: what throttle setting will make the ship hover? Hovering means thrust equals weight. The engine gives ${fmtN(MAX_THRUST)} at 100%, the ship's mass is ${fmt(MASS)} kg, and gravity on ${settings.world === 'Moon' ? 'the Moon' : settings.world} is ${WORLDS[settings.world]} m/s/s.`;
+    $('ovHover').textContent = `Before you fly: what throttle setting will make the ship hover? Hovering means thrust equals weight. The engine gives ${fmtN(CFG.thrust)} at 100%, the ship's mass is ${fmt(MASS)} kg, and gravity on ${settings.world === 'Moon' ? 'the Moon' : settings.world} is ${WORLDS[settings.world]} m/s/s.`;
   }
   function showEnd(title, text, opts = {}) {
     $('ovTitle').textContent = title; $('ovText').textContent = text;
@@ -565,14 +624,15 @@ button.primary { border-width: 2.5px; }
     return [st.x + lx * Math.cos(r) + ly * Math.sin(r), st.y - lx * Math.sin(r) + ly * Math.cos(r)];
   }
 
-  const SAFE = () => game.upg.has('shocks') ? 2.5 : SAFE_V0;
+  const SAFE_Y = () => CFG.cleanVy + (game.upg.has('shocks') ? CFG.shockBonus : 0);
+  const SAFE_X = () => CFG.cleanVx + (game.upg.has('shocks') ? CFG.shockBonus : 0);
   function giveUpgrade() {   // called when a team is picked up; returns the message
     if (!game.upg.has('minimap')) { game.upg.add('minimap'); return 'Upgrade: minimap.'; }
     const open = Object.keys(UPGRADES).filter(k => !game.upg.has(k));
     if (!open.length) return '';
     const k = open[Math.floor(Math.random() * open.length)];
     game.upg.add(k);
-    if (k === 'plating') { game.hullMax += 20; game.hull = Math.min(game.hullMax, game.hull + 30); }
+    if (k === 'repair') { game.repairLeft = game.repairTotal = Math.round(CFG.repairFrac * (game.hullMax - game.hull)); game.repairAcc = 0; }   // restored gradually in step()
     return 'Upgrade: ' + UPGRADES[k] + '.';
   }
   const feetNow = () => SHIP.feet.filter(f => Math.sign(f[0]) !== game.legGone);
@@ -599,10 +659,10 @@ button.primary { border-width: 2.5px; }
   // random problems: one new problem each time the total damage passes a multiple of 20 (at 20 and 40);
   // which problem is random, and problems do not
   // stack (each can happen once)
-  const FAULT_NAMES = { handling: 'worse handling', fuel: 'poor fuel efficiency', misfire: 'engine misfires', life: 'life support failing', coolant: 'coolant leak' };
+  const FAULT_NAMES = { handling: 'worse handling', fuel: 'poor fuel efficiency', misfire: 'engine damage', life: 'life support failing', coolant: 'coolant leak' };
   function rollFaults(dmg) {
     const got = [], total = game.dmgTotal;   // damage so far, this landing included (repairs don't reduce it)
-    const n = Math.floor(total / 20) - Math.floor((total - dmg) / 20);
+    const n = Math.floor(total / CFG.faultEvery) - Math.floor((total - dmg) / CFG.faultEvery);
     for (let i = 0; i < n; i++) {
       const open = Object.keys(game.faults).filter(k => !game.faults[k]);
       if (!open.length) break;
@@ -634,11 +694,15 @@ button.primary { border-width: 2.5px; }
       if (T.t >= 1) game.topple = null;
       return;
     }
+    if (game.repairLeft > 0) {   // crew repairs: hull points come back gradually
+      game.repairAcc = (game.repairAcc || 0) + dt * game.repairTotal / CFG.repairTime;
+      while (game.repairAcc >= 1 && game.repairLeft > 0) { game.repairAcc -= 1; game.repairLeft--; game.hull = Math.min(game.hullMax, game.hull + 1); }
+    }
     if (game.fuel <= 0 && game.main) setMain(false);
-    let thrust = game.main ? game.throttle * MAX_THRUST : 0;
-    // engine misfires: short random cut-outs while firing
+    // engine damage: 20% less maximum thrust, and while firing it cuts out for 0.25-0.75 s, 5-8 times a minute
+    let thrust = game.main ? game.throttle * CFG.thrust * (F.misfire ? CFG.engDmgPower : 1) : 0;
     if (game.misfireT > 0) game.misfireT -= dt;
-    else if (F.misfire && thrust > 0 && Math.random() < 0.12 * F.misfire * dt) game.misfireT = 0.25 + Math.random() * 0.45;
+    else if (F.misfire && thrust > 0 && Math.random() < (CFG.cutsPerMin[0] + Math.random() * (CFG.cutsPerMin[1] - CFG.cutsPerMin[0])) / 60 * dt) game.misfireT = 0.25 + Math.random() * 0.5;
     if (game.misfireT > 0) thrust = 0;
     // coolant leak: the engine heats up while firing and shuts down when it overheats, until it cools
     if (F.coolant) {
@@ -651,7 +715,7 @@ button.primary { border-width: 2.5px; }
       if (game.overheat) thrust = 0;
     }
     const m = shipMass();
-    game.fuel = Math.max(0, game.fuel - fuelPerN() * thrust * dt * (1 + 0.15 * F.fuel) * (game.upg.has('economy') ? 0.8 : 1));   // poor efficiency +15%, economy upgrade -20%
+    game.fuel = Math.max(0, game.fuel - fuelPerN() * thrust * dt * (F.misfire ? CFG.engDmgFuel / CFG.engDmgPower : 1) * (F.fuel ? CFG.poorFuel : 1) * (game.upg.has('economy') ? CFG.economy : 1));   // poor efficiency +15%, economy upgrade -20%
 
     stepBoarders(dt);
     if (game.state === 'landed') {
@@ -665,10 +729,13 @@ button.primary { border-width: 2.5px; }
     if (game.liftLock && s.alt >= 5) game.liftLock = false;
     if (game.launching && s.vy < 0) game.launching = false;   // launching ends once the ship starts coming down
     // worse handling: slower turning (20% less per level) and a slow wandering drift
-    const rr = (game.upg.has('turning') ? 63 : ROT_RATE) * Math.max(0.4, 1 - 0.2 * F.handling);
-    if (!game.liftLock && keys.has('ArrowLeft'))  s.rot = Math.max(-90, s.rot - rr * dt);
-    if (!game.liftLock && keys.has('ArrowRight')) s.rot = Math.min(90,  s.rot + rr * dt);
-    if (!game.liftLock && F.handling) s.rot += (Math.sin(game.time * 0.83 + 1.1) + 0.6 * Math.sin(game.time * 2.31)) * 1.8 * F.handling * dt;
+    // worse handling: turning 20% slower, and now and then the controls stop answering for about half a second
+    const rr = (game.upg.has('turning') ? CFG.rotUp : CFG.rot) * (F.handling ? 0.8 : 1);
+    if (game.deadT > 0) game.deadT -= dt;
+    else if (F.handling && Math.random() < CFG.deadPerMin / 60 * dt) game.deadT = 0.4 + Math.random() * 0.3;
+    const steer = !game.liftLock && !(game.deadT > 0);
+    if (steer && keys.has('ArrowLeft'))  s.rot = Math.max(-90, s.rot - rr * dt);
+    if (steer && keys.has('ArrowRight')) s.rot = Math.min(90,  s.rot + rr * dt);
     s.thrusting = thrust > 0;
     const r = s.rot * Math.PI / 180, aT = thrust / m;
     s.ax = aT * Math.sin(r);
@@ -689,11 +756,10 @@ button.primary { border-width: 2.5px; }
   // After a pickup the surviving astronauts come out of the shelter door one after another and lope to the
   // ship's ladder: 2.0 m/s for the unhurt (a lunar lope), 0.9 m/s for the injured. The ship can't lift off
   // until everyone is aboard, so landing closer to the shelter (but outside 30 m) gets them in sooner.
-  const RUN_V = 2.0, LIMP_V = 0.9;
   function startBoarding(site, safe, injured) {
     game.boarders = [];
     const n = safe + injured;
-    for (let i = 0; i < n; i++) game.boarders.push({ x: site.shelterX, y: site.y, v: i < safe ? RUN_V : LIMP_V, delay: i * 0.8, ph: Math.random() * 6, done: false });
+    for (let i = 0; i < n; i++) game.boarders.push({ x: site.shelterX, y: site.y, v: i < safe ? CFG.runV : CFG.limpV, delay: i * 0.8, ph: Math.random() * 6, done: false });
     if (n) game.boardMsg = false;
   }
   const boarding = () => game.boarders && game.boarders.some(b => !b.done);
@@ -704,8 +770,17 @@ button.primary { border-width: 2.5px; }
       if (b.delay > 0) { b.delay -= dt; continue; }
       const d = s.x - b.x, stepX = Math.sign(d) * b.v * dt;
       if (Math.abs(d) <= Math.abs(stepX) + 0.3) { b.done = true; continue; }   // at the ladder: climbs aboard
-      b.x += stepX; b.ph += b.v * dt * 2.6;   // stride: about 1.2 m per step
+      b.x += stepX; b.ph += dt;   // time, for the hop cycle
     }
+  }
+  // Lunar lope: each stride is a real ballistic hop under the world's gravity. Light suits, so the hops are a bit
+  // higher than Apollo's. Unhurt: push off at 1.3 m/s upward (in lunar gravity about 1.6 s in the air, 0.52 m
+  // high, ~3.2 m per hop), then 0.15 s on the ground with knees bent. Injured: low 0.55 m/s shuffling hops. Body leans forward, arms out for balance.
+  function hopState(b) {
+    const vy0 = b.v < CFG.runV ? 0.55 : CFG.hopV, air = 2 * vy0 / grav, ground = 0.15, T = air + ground;
+    const t = (b.ph + b.seed) % T;
+    if (t < air) return { y: vy0 * t - 0.5 * grav * t * t, u: t / air, air: true };
+    return { y: 0, u: (t - air) / ground, air: false };
   }
   function drawBoarders() {
     if (!game.boarders) return;
@@ -714,16 +789,24 @@ button.primary { border-width: 2.5px; }
     ctx.save(); ctx.strokeStyle = '#FFFFFF'; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineWidth = Math.max(1.2, k * 0.12);
     for (const b of game.boarders) {
       if (b.done || b.delay > 0) continue;
-      const dir = Math.sign(s.x - b.x) || 1, sw = Math.sin(b.ph), limp = b.v < RUN_V;
-      const hop = limp ? 0 : 0.25 * Math.abs(Math.sin(b.ph));   // low, bounding lope in lunar gravity
-      const P = (lx, ly) => [SX(b.x + dir * lx), SY(groundAt(b.x) + hop + ly)];
-      const hip = P(0, 0.9), sh = P(0.12, 1.42), head = P(0.16, 1.65);
-      const leg = a => P(Math.sin(a) * 0.9, 0.9 - Math.cos(a) * 0.9), arm = a => P(0.12 + Math.sin(a) * 0.5, 1.42 - Math.cos(a) * 0.5);
-      const a1 = 0.6 * sw * (limp ? 0.5 : 1), a2 = -a1;
+      if (b.seed === undefined) b.seed = Math.random() * 2;
+      const dir = Math.sign(s.x - b.x) || 1, h = hopState(b);
+      const P = (lx, ly) => [SX(b.x + dir * lx), SY(groundAt(b.x) + h.y + ly)];
+      // crouch on the ground (knees bend most mid-contact), stretched out in the air
+      const crouch = h.air ? 0 : Math.sin(Math.PI * h.u) * 0.25;
+      const hipY = 0.9 - crouch, lean = 0.18;
+      const hip = P(0, hipY), sh = P(lean, hipY + 0.52), head = P(lean + 0.05, hipY + 0.75);
+      // legs: in the air the trailing leg swings back and the lead leg reaches forward; on the ground both bend
+      const spread = h.air ? 0.35 * Math.sin(Math.PI * h.u) : 0.1;
+      const knee = (f) => P(f * 0.25 + 0.12, hipY - 0.45 + (h.air ? 0 : crouch * 0.4));
+      const foot = (f) => P(f * 0.45, h.air ? hipY - 0.88 : 0);
       ctx.beginPath();
-      ctx.moveTo(...hip); ctx.lineTo(...leg(a1)); ctx.moveTo(...hip); ctx.lineTo(...leg(a2));
+      for (const f of [spread, -spread]) { ctx.moveTo(...hip); ctx.lineTo(...knee(f)); ctx.lineTo(...foot(f)); }
       ctx.moveTo(...hip); ctx.lineTo(...sh);
-      ctx.moveTo(...sh); ctx.lineTo(...arm(-a1 * 0.8)); ctx.moveTo(...sh); ctx.lineTo(...arm(-a2 * 0.8));
+      // arms held out from the body for balance, bobbing slightly
+      const ab = h.air ? 0.1 * Math.sin(Math.PI * h.u) : -0.05;
+      ctx.moveTo(...sh); ctx.lineTo(...P(lean + 0.42, hipY + 0.3 + ab));
+      ctx.moveTo(...sh); ctx.lineTo(...P(lean - 0.3, hipY + 0.25 + ab));
       ctx.stroke();
       ctx.beginPath(); ctx.arc(head[0], head[1], 0.17 * k, 0, Math.PI * 2); ctx.fillStyle = '#000000'; ctx.fill(); ctx.stroke();
     }
@@ -767,7 +850,7 @@ button.primary { border-width: 2.5px; }
     const feet = SHIP.feet.map(p => toWorld(p));
     const fa = Math.min(feet[0][0], feet[1][0]), fb = Math.max(feet[0][0], feet[1][0]);
     const flat = flatUnder(fa, fb);
-    const upright = Math.abs(s.rot) <= MAX_TILT;
+    const tilt = Math.abs(s.rot), upright = tilt <= CFG.tiltCrash;
     const tdv = `Touchdown: ${Math.abs(s.vy).toFixed(1)} m/s down, ${Math.abs(s.vx).toFixed(1)} m/s sideways, ${Math.abs(Math.round(s.rot))}° tilt.`;
     game.log.push([game.time, 0, s.vy]);
     setMain(false); s.thrusting = false;
@@ -781,17 +864,20 @@ button.primary { border-width: 2.5px; }
     // hard landing: damage, a snapped leg, random problems
     const down = Math.max(0, -s.vy), side = Math.abs(s.vx);
     const over = (v, lim) => v > lim ? Math.floor((v - lim) * 10 + 1e-9) : 0;
-    const dmg = over(down, SAFE()) + over(side, SAFE());
-    const snap = down > SNAP_V || side > SNAP_V;
-    const legSide = side > 0.5 ? Math.sign(s.vx) : Math.abs(s.rot) > 1 ? Math.sign(s.rot) : (Math.random() < 0.5 ? -1 : 1);
+    const tiltDmg = tilt > CFG.tiltClean ? Math.floor(tilt - CFG.tiltClean + 1e-9) * CFG.tiltDmg : 0;
+    const dmg = (over(down, SAFE_Y()) + over(side, SAFE_X())) * CFG.dmgPerTenth + tiltDmg;
+    const tiltSnap = tilt >= CFG.tiltSnap;
+    const snap = down > CFG.snapV || side > CFG.snapV || tiltSnap;
+    // which leg breaks: the lower one when tilted, else the leading one, else either
+    const legSide = tiltSnap || (Math.abs(s.rot) > 1 && side <= 0.5) ? Math.sign(s.rot) : side > 0.5 ? Math.sign(s.vx) : (Math.random() < 0.5 ? -1 : 1);
     const vxWas = s.vx;
     s.y = flat.y + 3.5; s.rot = 0; s.vx = 0; s.vy = 0; s.ax = 0; s.ay = 0; s.alt = 0;
     game.state = 'landed';
     let dmgText = '';
     if (dmg > 0 || snap) {
       game.hull = Math.max(0, game.hull - dmg); game.dmgTotal += dmg;
-      dmgText = `Hard landing: ${dmg} damage, hull ${game.hull}/${game.hullMax}.`;
-      if (!game.legGone && (snap || game.dmgTotal >= LEG_LOSS_AT)) {
+      dmgText = `Hard landing: ${dmg} damage${tiltDmg ? ` (${tiltDmg} from the tilt)` : ''}, hull ${game.hull}/${game.hullMax}.`;
+      if (!game.legGone && (snap || game.dmgTotal >= CFG.legLossAt)) {
         game.legGone = snap ? legSide : (Math.random() < 0.5 ? -1 : 1);
         dmgText += ` The ${game.legGone < 0 ? 'left' : 'right'} leg broke off.`;
       }
@@ -830,11 +916,12 @@ button.primary { border-width: 2.5px; }
     game.tally.safe += safe; game.tally.injured += h.injured; game.tally.killed += h.killed;
     // checkpoint: a crash or running out of fuel later restarts here, landed at this shelter
     game.cp = { site: flat, x: s.x, score: game.score, tally: { ...game.tally }, picked: [...game.picked], fuel: game.fuel, time: game.time,
-      hull: game.hull, hullMax: game.hullMax, dmgTotal: game.dmgTotal, upg: [...game.upg], legGone: game.legGone, faults: { ...game.faults }, lifeLeft: game.lifeLeft, fallen: !!game.legGone };
+      hull: game.hull, hullMax: game.hullMax, dmgTotal: game.dmgTotal, upg: [...game.upg], repairLeft: game.repairLeft || 0, repairTotal: game.repairTotal || 0, legGone: game.legGone, faults: { ...game.faults }, lifeLeft: game.lifeLeft, fallen: !!game.legGone };
     const hurt = [h.injured ? `${h.injured} injured` : '', h.killed ? `${h.killed} killed` : ''].filter(Boolean).join(', ');
     const msg = `Team picked up ${Math.round(d)} m from the shelter: ${safe} safe${hurt ? ', ' + hurt : ''}. ${pts >= 0 ? '+' : ''}${pts} points${upText ? '. ' + upText.replace(/\.$/, '') : ''}`;
-    if (settings.edu) showEnd('Team picked up', msg + '. ' + tdv2.replace('\n', ' '), { cont: true });
-    else toast(msg + '\n' + tdv2, 8000);
+    const home = game.picked.size === SITES.length ? '\nAll five teams are aboard. Return to base.' : '';
+    if (settings.edu) showEnd('Team picked up', msg + '. ' + tdv2.replace('\n', ' ') + home.replace('\n', ' '), { cont: true });
+    else toast(msg + '\n' + tdv2 + home, home ? 12000 : 8000);
   }
   const footDist = (fa, fb, t) => Math.max(0, Math.min(Math.abs(fa - t.shelterX), Math.abs(fb - t.shelterX)));
 
@@ -1140,8 +1227,8 @@ button.primary { border-width: 2.5px; }
         const yOff = Math.abs(fy) / 2 < F * 1.3 ? (down ? F * 1.3 : -F * 1.3) : fy / 2;
         const Ly = mkLabel('v', 'y', ' = ' + sgn(s.vy) + ' m/s', F, VX + 16, Y0 + yOff, 'left');
         const parts = [
-          { bad: Math.abs(s.vx) > SAFE(), x1: VX + fx, y1: Y0, L: Lx },
-          { bad: s.vy < -SAFE(), x1: VX, y1: Y0 + fy, L: Ly }
+          { bad: Math.abs(s.vx) > SAFE_X(), x1: VX + fx, y1: Y0, L: Lx },
+          { bad: s.vy < -SAFE_Y(), x1: VX, y1: Y0 + fy, L: Ly }
         ];
         const box = list => {   // one box around the arrows and values given
           const xs = list.flatMap(c => [VX, c.x1, c.L.x, c.L.x + c.L.w]), ys = list.flatMap(c => [Y0, c.y1, c.L.y, c.L.y + c.L.h]);
@@ -1210,7 +1297,16 @@ button.primary { border-width: 2.5px; }
       const dx = tip ? tip[0] - cx : (vTip && vTip[0] - cx > 4 ? -1 : 1), dy = tip ? tip[1] - cy : 0, L = Math.hypot(dx, dy);
       const ux = L > 1 || !tip ? dx / L : 1, uy = L > 1 || !tip ? dy / L : 0, R = Math.max(tip ? L : 0, shipR) + 10;
       const x = cx + ux * R, y = cy + uy * R + (Math.abs(ux) < 0.4 ? (uy >= 0 ? F / 2 : -F / 2) : 0);
-      return mkLabel(main, sub, rest, F, x, y, ux >= 0 ? 'left' : 'right');
+      const L0 = mkLabel(main, sub, rest, F, x, y, ux >= 0 ? 'left' : 'right');
+      // the arrow (or its label) runs off the screen: put the label near the ship instead, just beside the
+      // arrow's line (above a sideways arrow, to one side of an up or down arrow)
+      const off = l => l.x < 10 || l.x + l.w > pxW - 10 || l.y < 10 || l.y + l.h > pxH - 10;
+      if (tip && off(L0)) {
+        const r = shipR + 80, mx = cx + ux * r, my = cy + uy * r;
+        if (Math.abs(ux) >= 0.6) return mkLabel(main, sub, rest, F, mx, my - F * 1.1, 'center');
+        return mkLabel(main, sub, rest, F, mx + 10, my, 'left');
+      }
+      return L0;
     };
     labels.push(beyond(vTip, 'v', '', vText), beyond(aTip, 'a', '', aText));
     if (settings.vcomp && vTip) {
@@ -1270,7 +1366,9 @@ button.primary { border-width: 2.5px; }
     // vertical parallax: when the viewpoint is higher than the ground level they stand on, the ground drops on
     // screen by the full height difference but each layer only by 25% / 50% of it, so climbing shows more of them
     for (const D of BG_DEPTHS) {
-      const horizon = SY(ref) - (1 - D.p) * (camY - ref) * kf;
+      // ...but the lift is capped (far layer 25 m, near 12 m) so climbing high doesn't uncover long slopes
+      // below them and turn them into towers
+      const horizon = SY(ref) - Math.min((1 - D.p) * (camY - ref), D.p < 0.4 ? 25 : 12) * kf;
       for (const M of D.m) {
         const sx = (M.x - D.p * camC) * kf + pxW / 2;   // parallax: shifts only when the camera moves, far layer less
         if (sx + M.x1 * kf < -20 || sx + M.x0 * kf > pxW + 20) continue;
@@ -1371,7 +1469,7 @@ button.primary { border-width: 2.5px; }
   function drawFBD() {
     const flying = game.state === 'flying' || game.state === 'ready';
     const m = shipMass(), W = m * grav;
-    const T = flying && s.thrusting ? game.throttle * MAX_THRUST : 0;
+    const T = flying && s.thrusting ? game.throttle * CFG.thrust : 0;
     const r = s.rot * Math.PI / 180;
     const Tx = T * Math.sin(r), Ty = T * Math.cos(r);
     const onGround = !flying;
@@ -1385,7 +1483,7 @@ button.primary { border-width: 2.5px; }
 
     // one fixed scale (N per pixel) so arrow lengths can be compared; dot at 60% height
     const Wd = fbdC.width, Hd = fbdC.height, cx = Wd * 0.42, cy = Hd * 0.6;
-    const k = Math.min(0.55 * Hd / MAX_THRUST, 0.34 * Hd / W);
+    const k = Math.min(0.55 * Hd / CFG.thrust, 0.34 * Hd / W);
     fctx.setTransform(1, 0, 0, 1, 0, 0); fctx.clearRect(0, 0, Wd, Hd);
     fctx.fillStyle = '#FFFFFF'; fctx.font = '24px "Share Tech Mono", monospace';
     fctx.beginPath(); fctx.arc(cx, cy, 8, 0, Math.PI * 2); fctx.fill();
@@ -1472,18 +1570,18 @@ button.primary { border-width: 2.5px; }
     const ax = nr.left + nr.width / 2 - sr.left, ay = nr.top + nr.height / 2 - sr.top;
     drawNav(SX(t.x) - ax, -(SY(t.y) - ay));
     $('rF').textContent = Math.ceil(game.fuel) + '%';
-    $('rTime').textContent = fmtTime(game.time) + (game.state === 'landed' && boarding() ? '  ×3' : '');
+    $('rTime').textContent = fmtTime(game.time) + (game.state === 'landed' && boarding() ? '  ×' + CFG.boardFF : '');
     $('timeBox').hidden = game.state === 'intro';
     $('rHull').textContent = game.hull + '/' + game.hullMax;
     $('hullFill').style.width = Math.max(0, game.hull / game.hullMax * 100) + '%';
     const F = game.faults, lvl = n => n > 1 ? ' ×' + n : '', lines = [];
     if (game.legGone) lines.push((game.legGone < 0 ? 'Left' : 'Right') + ' leg broken');
-    if (F.handling) lines.push('Worse handling' + lvl(F.handling));
+    if (F.handling) lines.push('Worse handling' + (game.deadT > 0 ? ': not responding' : ''));
     if (F.fuel) lines.push('Fuel use +15%');
-    if (F.misfire) lines.push('Engine misfires' + lvl(F.misfire));
+    if (F.misfire) lines.push('Engine damage');
     if (F.coolant) lines.push('Coolant leak' + lvl(F.coolant));
     if (game.lifeLeft !== null) lines.push('Life support ' + fmtTime(Math.max(0, game.lifeLeft)));
-    const short = { minimap: 'Minimap', path: 'Trajectory path', turning: 'Faster turning', economy: 'Fuel economy', shocks: 'Shock absorbers', plating: 'Hull plating' };
+    const short = { minimap: 'Minimap', path: 'Trajectory path', turning: 'Faster turning', economy: 'Fuel economy', shocks: 'Shock absorbers', repair: 'Crew repairs' };
     if (game.upg.size) lines.push('Upgrades:', ...[...game.upg].map(k => '  ' + short[k]));
     const ft = lines.join('\n');
     if ($('faults').dataset.t !== ft) {
@@ -1495,7 +1593,7 @@ button.primary { border-width: 2.5px; }
     $('heatFill').style.width = Math.round(game.heat * 100) + '%';
     $('rHeat').textContent = game.overheat ? 'HOT' : Math.round(game.heat * 100) + '%';
     const firing = game.main && !game.overheat && !(game.misfireT > 0);
-    $('rPow').textContent = game.overheat && game.main ? 'HOT' : game.main && game.misfireT > 0 ? 'MISFIRE' : game.main ? 'ON' : 'OFF';
+    $('rPow').textContent = game.overheat && game.main ? 'HOT' : game.main && game.misfireT > 0 ? 'CUT OUT' : game.main ? 'ON' : 'OFF';
     $('rPow').classList.toggle('on', firing);
     $('fuelFill').style.width = Math.max(0, game.fuel) + '%';
     // big altitude readout, close view only: feet to the ground directly below
@@ -1503,7 +1601,7 @@ button.primary { border-width: 2.5px; }
     $('rH').textContent = Math.max(0, s.alt).toFixed(1) + ' m';
     flash += dt;
     const flying = game.state === 'flying';
-    const danger = flying && s.alt < 10 && (s.vy < -SAFE() || Math.abs(s.vx) > SAFE());
+    const danger = flying && s.alt < 10 && (s.vy < -SAFE_Y() || Math.abs(s.vx) > SAFE_X());
     const lowFuel = (flying || game.state === 'landed') && game.fuel < 10;
     const w = $('warn');
     if (danger) w.textContent = 'Altitude warning: too fast';
@@ -1518,7 +1616,7 @@ button.primary { border-width: 2.5px; }
   function frame(now) {
     const dtReal = Math.min(0.1, (now - last) / 1000); last = now;
     // while the crew runs to the ship, the game (and the mission timer) fast-forwards 3x
-    acc += dtReal * (game && game.state === 'landed' && boarding() ? 3 : 1);
+    acc += dtReal * (game && game.state === 'landed' && boarding() ? CFG.boardFF : 1);
     const h = 1 / 120;
     while (acc >= h) { step(h); acc -= h; }
     updateView(); draw(); updateUI(dtReal);
@@ -1553,7 +1651,7 @@ button.primary { border-width: 2.5px; }
     setup('mission');
     Object.assign(game, { score: cp.score, tally: { ...cp.tally }, picked: new Set(cp.picked), fuel: cp.fuel, time: cp.time, cp });
     Object.assign(s, { x: cp.x, y: cp.site.y + 3.5, vx: 0, vy: 0, rot: 0, ax: 0, ay: 0, alt: 0 });
-    Object.assign(game, { hull: cp.hull, hullMax: cp.hullMax, dmgTotal: cp.dmgTotal, upg: new Set(cp.upg), legGone: cp.legGone, faults: { ...cp.faults }, lifeLeft: cp.lifeLeft });
+    Object.assign(game, { hull: cp.hull, hullMax: cp.hullMax, dmgTotal: cp.dmgTotal, upg: new Set(cp.upg), repairLeft: cp.repairLeft, repairTotal: cp.repairTotal, legGone: cp.legGone, faults: { ...cp.faults }, lifeLeft: cp.lifeLeft });
     if (cp.legGone) { startTopple(); game.topple.t = 1; setPose(game.topple.F, game.topple.pf, game.topple.to); game.topple = null; }   // already lying over
     view.close = true; view.landing = false; view.place = true; view.resetY = true;
     $('overlay').hidden = true; window.focus();
@@ -1569,6 +1667,8 @@ button.primary { border-width: 2.5px; }
 
   const ARROWS = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
   window.addEventListener('keydown', e => {
+    if (e.key === '`') { e.preventDefault(); toggleDev(); return; }
+    if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;   // typing in the dev panel
     if (ARROWS.includes(e.key)) {
       e.preventDefault(); keys.add(e.key);
       if (live() && !e.repeat && e.key === 'ArrowUp') setThrottle(game.throttle + 0.1);
@@ -1615,8 +1715,145 @@ button.primary { border-width: 2.5px; }
   $('bMenu').addEventListener('click', showMenu);
   document.querySelectorAll('button').forEach(b => b.addEventListener('keydown', e => { if (e.key === ' ') { e.preventDefault(); } }));
 
+  // ---------- dev panel (press ` to open or close) ----------
+  // Change any setting live (site lengths need "Apply and restart"), place the ship anywhere by clicking, set
+  // its speed, tilt, fuel, hull, upgrades and problems, then "Copy changes" to paste the settings to Claude.
+  const DEV_LABELS = {
+    grav: 'Gravity, Moon (m/s/s)', thrust: 'Engine thrust at 100% (N)', burnS: 'Full-tank burn time (s)',
+    rot: 'Turn rate (deg/s)', rotUp: 'Turn rate with upgrade (deg/s)',
+    cleanVy: 'Clean landing, down (m/s)', cleanVx: 'Clean landing, sideways (m/s)', shockBonus: 'Shock absorbers add (m/s)',
+    dmgPerTenth: 'Damage per 0.1 m/s over', snapV: 'Leg snaps above (m/s)',
+    tiltClean: 'Clean tilt up to (deg)', tiltDmg: 'Damage per degree over', tiltSnap: 'Leg snaps at tilt (deg)', tiltCrash: 'Crash above tilt (deg)',
+    hull: 'Hull points (on restart)', legLossAt: 'Leg breaks at total damage', faultEvery: 'New problem every (damage)',
+    repairFrac: 'Crew repair (fraction of damage)', repairTime: 'Crew repair takes (s)', economy: 'Fuel economy upgrade (x fuel use)', poorFuel: 'Poor efficiency (x fuel use)',
+    engDmgPower: 'Engine damage: power (x)', engDmgFuel: 'Engine damage: fuel use (x)', deadPerMin: 'Handling: dead spells per minute',
+    runV: 'Crew run speed (m/s)', limpV: 'Injured speed (m/s)', hopV: 'Hop push-off (m/s up)', boardFF: 'Fast-forward while boarding (x)'
+  };
+  const devPlace = { vx: 0, vy: -1, tilt: 0, fuel: 100, hull: 60, armed: false };
+  function buildDev() {
+    const d = $('dev'); d.innerHTML = '';
+    const el = (tag, props = {}, kids = []) => { const e = document.createElement(tag); Object.assign(e, props); kids.forEach(k => e.append(k)); return e; };
+    const num = (val, step, on) => { const i = el('input', { type: 'number', value: val, step }); i.addEventListener('change', () => on(parseFloat(i.value))); return i; };
+    d.append(el('div', { textContent: 'Dev panel  ( ` to close )' }));
+    // place the ship
+    d.append(el('h3', { textContent: 'Place the ship' }));
+    const pg = el('div', { className: 'grid' });
+    for (const [k, lab, st] of [['vx', 'x velocity (m/s, + right)', 0.1], ['vy', 'y velocity (m/s, + up)', 0.1], ['tilt', 'Tilt (deg, + leans right)', 1], ['fuel', 'Fuel (%)', 1], ['hull', 'Hull points', 1]])
+      pg.append(el('span', { textContent: lab }), num(devPlace[k], st, v => { devPlace[k] = v; }));
+    d.append(pg);
+    const pb = el('button', { textContent: 'Click the screen to place the ship' });
+    pb.addEventListener('click', () => {
+      if (game.state === 'intro' || game.state === 'over' || game.state === 'done') { begin('mission'); game.paused = true; }
+      $('overlay').hidden = true;   // so the click reaches the screen
+      devPlace.armed = true; pb.textContent = 'Now click where the ship should go…';
+    });
+    d.append(pb, el('div', { className: 'hint', textContent: 'The ship is placed paused; press Space to fly.' }));
+    // ship state
+    d.append(el('h3', { textContent: 'Upgrades' }));
+    const ug = el('div');
+    for (const k of ['minimap', 'path', 'turning', 'economy', 'shocks', 'repair']) {
+      const c = el('input', { type: 'checkbox', checked: game.upg.has(k) });
+      c.addEventListener('change', () => { c.checked ? game.upg.add(k) : game.upg.delete(k); });
+      ug.append(el('label', { className: 'ck' }, [c, k]));
+    }
+    d.append(ug);
+    d.append(el('h3', { textContent: 'Problems' }));
+    const fg = el('div');
+    for (const k of Object.keys(game.faults)) {
+      const c = el('input', { type: 'checkbox', checked: !!game.faults[k] });
+      c.addEventListener('change', () => { game.faults[k] = c.checked ? 1 : 0; if (k === 'life') game.lifeLeft = c.checked ? 600 : null; });
+      fg.append(el('label', { className: 'ck' }, [c, k]));
+    }
+    const leg = el('select'); ['none', 'left', 'right'].forEach((o, i) => leg.append(el('option', { value: [0, -1, 1][i], textContent: 'broken leg: ' + o })));
+    leg.value = game.legGone; leg.addEventListener('change', () => { game.legGone = +leg.value; });
+    fg.append(leg); d.append(fg);
+    // settings
+    d.append(el('h3', { textContent: 'Settings (live)' }));
+    const sg = el('div', { className: 'grid' });
+    for (const k of Object.keys(DEV_LABELS)) sg.append(el('span', { textContent: DEV_LABELS[k] }), num(CFG[k], 'any', v => {
+      if (isNaN(v)) return;
+      CFG[k] = v;
+      if (k === 'grav') { WORLDS.Moon = v; if (settings.world === 'Moon') grav = v; }
+    }));
+    d.append(sg);
+    d.append(el('h3', { textContent: 'Landing-site lengths (m; need restart)' }));
+    const wg = el('div', { className: 'grid' });
+    SITES.forEach((t, i) => wg.append(el('span', { textContent: t.name }), num(CFG.siteW[i], 1, v => { if (!isNaN(v)) CFG.siteW[i] = v; })));
+    d.append(wg);
+    // output
+    const ta = el('textarea', { readOnly: true });
+    const cp = el('button', { textContent: 'Copy changes' }), ap = el('button', { textContent: 'Apply and restart' }), rs = el('button', { textContent: 'Reset to defaults' });
+    cp.addEventListener('click', () => {
+      const ch = {};
+      for (const k of Object.keys(CFG)) if (JSON.stringify(CFG[k]) !== JSON.stringify(CFG_DEFAULT[k])) ch[k] = CFG[k];
+      ta.value = 'Lunar Lander dev settings, changed from the built-in values:\n' + JSON.stringify(ch, null, 1);
+      ta.select();
+      const done = () => { cp.textContent = 'Copied'; setTimeout(() => cp.textContent = 'Copy changes', 1500); };
+      try { navigator.clipboard.writeText(ta.value).then(done, () => { document.execCommand('copy'); done(); }); }
+      catch (e) { try { document.execCommand('copy'); done(); } catch (e2) {} }
+    });
+    ap.addEventListener('click', () => { try { localStorage.setItem('llDevCfg', JSON.stringify(CFG)); } catch (e) {} location.reload(); });
+    rs.addEventListener('click', () => { try { localStorage.removeItem('llDevCfg'); } catch (e) {} location.reload(); });
+    d.append(el('div', { className: 'btnrow' }, [cp, ap, rs]), ta,
+      el('div', { className: 'hint', textContent: 'Live settings apply now. "Apply and restart" keeps them (in this browser) and rebuilds the map. Copy the box and paste it to Claude to make them permanent.' }));
+  }
+  function toggleDev() { const d = $('dev'); d.hidden = !d.hidden; if (!d.hidden) buildDev(); }
+  cv.addEventListener('click', e => {
+    if (!devPlace.armed) return;
+    devPlace.armed = false;
+    if (game.state === 'intro' || game.state === 'over' || game.state === 'done') begin('mission');
+    const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+    const x = view.x + mx / view.scale, y = view.y + (pxH - my) / view.scale;
+    $('overlay').hidden = true;
+    Object.assign(s, { x, y: Math.max(y, groundAt(x) + 3.6), vx: devPlace.vx, vy: devPlace.vy, rot: devPlace.tilt, ax: 0, ay: 0 });
+    s.alt = s.y - 3.5 - groundAt(s.x);
+    game.fuel = devPlace.fuel; game.hull = Math.min(game.hullMax, devPlace.hull);
+    game.state = 'flying'; game.liftLock = false; game.launching = false; game.topple = null; game.paused = true;
+    view.close = false; view.landing = false; view.place = true; view.resetY = true;
+    buildDev();
+  });
+
+  // ---------- touch mode ----------
+  // On automatically on touchscreens (iPad, Android tablets); the "Touch controls" menu button overrides it.
+  // The keyboard always works too. Hold the arrows to rotate, hold FIRE to fire; + and - step the throttle.
+  // Tapping the screen does what Space does when the game is paused, waiting to start, or over.
+  settings.touch = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || navigator.maxTouchPoints > 0;
+  function setTouch(on) {
+    settings.touch = on;
+    $('touchpad').hidden = !on; document.querySelector('.app').classList.toggle('touch', on);
+    $('bTouch').textContent = on ? 'On' : 'Off'; $('bTouch').setAttribute('aria-pressed', on);
+    checkOrientation();
+  }
+  $('bTouch').addEventListener('click', () => setTouch(!settings.touch));
+  const hold = (id, down, up) => {
+    const b = $(id);
+    b.addEventListener('pointerdown', e => { e.preventDefault(); try { b.setPointerCapture(e.pointerId); } catch (x) {} b.classList.add('down'); down(); });
+    const end = e => { if (!b.classList.contains('down')) return; b.classList.remove('down'); up(); };
+    b.addEventListener('pointerup', end); b.addEventListener('pointercancel', end); b.addEventListener('lostpointercapture', end);
+    b.addEventListener('contextmenu', e => e.preventDefault());
+  };
+  hold('tL', () => keys.add('ArrowLeft'), () => keys.delete('ArrowLeft'));
+  hold('tR', () => keys.add('ArrowRight'), () => keys.delete('ArrowRight'));
+  hold('tFire', () => { if (live()) setMain(true); }, () => setMain(false));
+  hold('tUp', () => { if (live()) setThrottle(game.throttle + 0.1); }, () => {});
+  hold('tDn', () => { if (live()) setThrottle(game.throttle - 0.1); }, () => {});
+  hold('tPause', () => spacePressed(), () => {});
+  cv.addEventListener('pointerdown', e => {
+    if (!settings.touch || devPlace.armed) return;
+    if (game.paused || ['ready', 'over', 'done'].includes(game.state)) spacePressed();
+  });
+  // landscape only: in portrait, cover the game and pause it
+  function checkOrientation() {
+    const portrait = settings.touch && innerHeight > innerWidth;
+    $('rotateMsg').hidden = !portrait;
+    if (portrait && game && game.state === 'flying') game.paused = true;
+  }
+  addEventListener('resize', checkOrientation);
+  addEventListener('orientationchange', checkOrientation);
+  document.addEventListener('gesturestart', e => e.preventDefault());   // no pinch-zoom on iPad while playing
+
   new ResizeObserver(() => { resize(); }).observe(stage);
-  resize(); showMenu(); requestAnimationFrame(frame);
+  resize(); showMenu(); setTouch(settings.touch); requestAnimationFrame(frame);
 })();
 </script>
 
