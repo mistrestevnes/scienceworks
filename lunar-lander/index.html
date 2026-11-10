@@ -173,6 +173,12 @@ button.primary { border-width: 2.5px; }
   white-space: nowrap;
 }
 .warning.off { visibility: hidden; }
+.ach {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 30; pointer-events: none;
+  border: 1.5px solid var(--line); background: var(--bg); padding: 14px 34px; text-align: center; white-space: nowrap;
+}
+.ach .lbl { font-size: 20px; }
+.ach .name { font-size: 30px; line-height: 1.2; }
 
 .devpanel {
   position: absolute; top: 14px; right: 14px; bottom: 14px; width: 330px; overflow-y: auto; z-index: 20;
@@ -239,6 +245,7 @@ button.primary { border-width: 2.5px; }
       <div class="big" id="rNext">–</div>
     </div>
     <div class="warning off" id="warn" role="status">Altitude warning: too fast</div>
+    <div class="ach" id="ach" hidden role="status"><div class="lbl">Achievement unlocked:</div><div class="name" id="achName"></div></div>
 
     <div class="touchpad" id="touchpad" hidden>
       <button id="tL" aria-label="Rotate left">◀</button><button id="tR" aria-label="Rotate right">▶</button>
@@ -384,6 +391,9 @@ button.primary { border-width: 2.5px; }
     MAP_W = Math.round(MAP_W - shift);
   }
   for (const t of SITES) t.shelterX = t.side === 'left' ? t.x1 + 5 : t.x2 - 5;
+  // the large mountains (for the "after rescuing everyone" achievement): the 480 m mountain between base and the
+  // plateau, and the 460 m mountain between the ravine and the mountain site together with the mountain site's slopes
+  const BIG = [[CONTROL[3][0], CONTROL[9][0]], [CONTROL[27][0], CONTROL[38][0]]];
   const FLATS = [BASE, ...SITES];
   const isFlat = (a, b) => FLATS.some(f => f.x1 === a[0] && f.x2 === b[0]);
 
@@ -556,6 +566,26 @@ button.primary { border-width: 2.5px; }
     }
     bgSmooth = raw.map((_, i) => { let sum = 0, n = 0; for (let j = i - 8; j <= i + 8; j++) if (raw[j] !== undefined) { sum += raw[j]; n++; } return sum / n; });
   }
+  // ---------- base: underground, entered through a large, low dome with a flat top ----------
+  // The dome is a slice of a sphere, 120 m across at the ground and 20 m high, cut flat on top. The flat top is
+  // the 20 m landing pad (both feet must be on it); touching the curved sides is a crash. At the start of a
+  // mission the ship rides a lift up from the base through a hatch in the pad. The dome is put into the ground
+  // after everything else is built, so the rest of the terrain, the rocks and the background are unchanged.
+  const DOME = { x1: BASE.x1, x2: BASE.x2, y: BASE.y, c: (BASE.x1 + BASE.x2) / 2, R: 98, pad: 20, hatch: 14 };
+  {
+    const D = DOME, hw = (D.x2 - D.x1) / 2;
+    D.yc = D.y - Math.sqrt(D.R ** 2 - hw ** 2);
+    D.top = Math.round((D.yc + Math.sqrt(D.R ** 2 - (D.pad / 2) ** 2)) * 100) / 100;
+    const prof = x => D.yc + Math.sqrt(D.R ** 2 - (x - D.c) ** 2);
+    const i = terrain.findIndex(p => p[0] === D.x1);
+    if (i < 0 || terrain[i + 1][0] !== D.x2) console.warn('dome: base corners not found');
+    const pts = [];
+    for (let x = D.x1 + 2; x < D.c - D.pad / 2 - 0.5; x += 2) pts.push([x, prof(x)]);
+    pts.push([D.c - D.pad / 2, D.top], [D.c + D.pad / 2, D.top]);
+    for (let x = D.c + D.pad / 2 + 2; x < D.x2 - 0.5; x += 2) pts.push([x, prof(x)]);
+    terrain.splice(i + 1, 0, ...pts);
+    BASE.x1 = D.c - D.pad / 2; BASE.x2 = D.c + D.pad / 2; BASE.y = D.top;   // the landing pad
+  }
   const smoothAt = x => { const i = Math.max(0, Math.min(bgSmooth.length - 2, (x + 3000) / 50)); const j = Math.floor(i), f = i - j; return bgSmooth[j] * (1 - f) + bgSmooth[j + 1] * f; };
   const flatUnder = (xa, xb) => FLATS.find(f => xa >= f.x1 && xb <= f.x2) || null;
 
@@ -583,7 +613,7 @@ button.primary { border-width: 2.5px; }
       log: [], logT: 0, wHeld: false, cp: null,
       hull: CFG.hull, hullMax: CFG.hull, dmgTotal: 0, upg: new Set(), legGone: 0,   // legGone: -1 left front leg broken, +1 right, 0 none
       faults: { handling: 0, fuel: 0, misfire: 0, life: 0, coolant: 0 }, lifeLeft: null,
-      heat: 0, overheat: false, misfireT: 0, topple: null
+      heat: 0, overheat: false, misfireT: 0, topple: null, emerge: null
     };
     if (mode === 'practice') {
       const t = SITES[practiceIdx];
@@ -594,7 +624,9 @@ button.primary { border-width: 2.5px; }
       game.state = 'ready';
       view.close = false;
     } else {
-      s = { x: (BASE.x1 + BASE.x2) / 2, y: BASE.y + 3.5, vx: 0, vy: 0, rot: 0, ax: 0, ay: 0, thrusting: false, alt: 0 };
+      s = { x: (BASE.x1 + BASE.x2) / 2, y: BASE.y + 3.5 - EMERGE.depth, vx: 0, vy: 0, rot: 0, ax: 0, ay: 0, thrusting: false, alt: 0 };
+      game.emerge = { t: 0, open: 0, lift: BASE.y - EMERGE.depth };   // inside the base, under the closed hatch
+      game.state = 'emerging';
       view.close = true;
     }
     setMain(false); setThrottle(START_THROTTLE);
@@ -624,7 +656,7 @@ button.primary { border-width: 2.5px; }
     $('overlay').hidden = false;
   }
   function refreshGoal() {
-    $('ovGoal').textContent = 'Pick up all five teams, then land back at base. Land on the flat ground beside each shelter. Touching down faster than 1.5 m/s down or 0.75 m/s sideways, or tilted more than 5°, damages the ship; faster than 6 m/s or tilted 10° or more breaks a leg; over 20° is a crash. Landing closer than 30 m to a shelter hurts the people inside.';
+    $('ovGoal').textContent = 'Pick up all five teams, then land back on the flat top of the base dome. Land on the flat ground beside each shelter. Touching down faster than 1.5 m/s down or 0.75 m/s sideways, or tilted more than 5°, damages the ship; faster than 6 m/s or tilted 10° or more breaks a leg; over 20° is a crash. Landing closer than 30 m to a shelter hurts the people inside.';
     $('ovHover').hidden = !settings.edu || game.state !== 'intro';
     $('ovHover').textContent = `Before you fly: what throttle setting will make the ship hover? Hovering means thrust equals weight. The engine gives ${fmtN(CFG.thrust)} at 100%, the ship's mass is ${fmt(MASS)} kg, and gravity on ${settings.world === 'Moon' ? 'the Moon' : settings.world} is ${WORLDS[settings.world]} m/s/s.`;
   }
@@ -716,7 +748,63 @@ button.primary { border-width: 2.5px; }
     showEnd(title, text + ' Press Space or R to restart the mission.');
   }
 
+  // ---------- leaving the base: the hatch in the pad opens and a lift raises the ship (controls locked) ----------
+  const EMERGE = { open: 1.5, wait: 0.4, rise: 5, depth: 16 };   // s for the hatch doors, s pause, s for the lift, m below the pad
+  const emergeNow = () => game.emerge && (game.state === 'emerging' || game.state === 'intro') ? game.emerge : null;
+  function stepEmerge(dt) {
+    const E = game.emerge; E.t += dt;
+    const o = Math.min(1, E.t / EMERGE.open); E.open = 0.5 - 0.5 * Math.cos(Math.PI * o);
+    const u = Math.max(0, Math.min(1, (E.t - EMERGE.open - EMERGE.wait) / EMERGE.rise));
+    // the lift starts and stops smoothly (cosine speed profile)
+    E.lift = BASE.y - EMERGE.depth + EMERGE.depth * (1 - Math.cos(Math.PI * u)) / 2;
+    s.y = E.lift + 3.5; s.alt = 0; s.ax = 0;
+    s.vy = u > 0 && u < 1 ? EMERGE.depth * Math.PI / 2 * Math.sin(Math.PI * u) / EMERGE.rise : 0;
+    if (u >= 1) { s.y = BASE.y + 3.5; s.vy = 0; game.emerge = null; game.state = 'landed'; }
+  }
+
+  // ---------- achievements: remembered in this browser (placeholder names) ----------
+  const ACH = {
+    mountain: 'Crash into a mountain', landing: 'Crash while landing', team: 'Rescue a team', damage: 'Damage your vessel',
+    leg: 'Lose a leg', allTeams: 'Rescue all teams', complete: 'Complete the game', bigMountain: 'Die after rescuing everyone'
+  };
+  let achGot = new Set();
+  try { achGot = new Set(JSON.parse(localStorage.getItem('llAchievements') || '[]')); } catch (e) {}
+  const achQueue = []; let achTimer = null;
+  function achieve(id) {
+    if (achGot.has(id)) return;
+    achGot.add(id);
+    try { localStorage.setItem('llAchievements', JSON.stringify([...achGot])); } catch (e) {}
+    achQueue.push(ACH[id]);
+    if (!achTimer) nextAch();
+  }
+  function nextAch() {
+    const name = achQueue.shift();
+    if (!name) { achTimer = null; $('ach').hidden = true; return; }
+    $('achName').textContent = name; $('ach').hidden = false; placeAch();
+    achTimer = setTimeout(nextAch, 3500);
+  }
+  // in the middle of the screen; when a message box is open there, just above it instead
+  function placeAch() {
+    const a = $('ach'), ov = $('overlay');
+    if (a.hidden) return;
+    let top = '50%';
+    if (!ov.hidden) {
+      const above = (stage.clientHeight - ov.offsetHeight) / 2 - 16 - a.offsetHeight / 2;
+      top = Math.max(14 + a.offsetHeight / 2, above) + 'px';
+    }
+    if (a.style.top !== top) a.style.top = top;
+  }
+  // a crash: on or next to a landing site (within 30 m, or on the base dome) counts as crashing while landing,
+  // anywhere else as crashing into a mountain
+  function noteCrash(flat) {
+    const x = s.x;
+    const near = !!flat || FLATS.some(f => f.base ? x > DOME.x1 - 30 && x < DOME.x2 + 30 : x > f.x1 - 30 && x < f.x2 + 30);
+    achieve(near ? 'landing' : 'mountain');
+    if (game.mode === 'mission' && game.picked.size === SITES.length && !flat && BIG.some(([a, b]) => x >= a && x <= b)) achieve('bigMountain');
+  }
+
   function step(dt) {
+    if (game.state === 'emerging') { if (!game.paused && $('overlay').hidden) stepEmerge(dt); return; }
     if (game.paused || (game.state !== 'flying' && game.state !== 'landed')) return;
     if ($('overlay').hidden === false) return;                 // results showing
     game.time += dt;
@@ -894,6 +982,7 @@ button.primary { border-width: 2.5px; }
     spawnDust(feet, Math.hypot(s.vx, s.vy));
     if (!(flat && upright)) {
       const why = !flat ? 'Not a landing site' : 'Tilted too far';
+      noteCrash(flat);
       game.state = 'over'; hideToast();
       showEnd('Crashed', why + '. ' + tdv + (game.mode === 'mission' && game.cp ? ` Press Space to restart from the ${game.cp.site.name.toLowerCase()} shelter, or R to restart the mission.` : ' Press Space to try again.'));
       return;
@@ -913,9 +1002,11 @@ button.primary { border-width: 2.5px; }
     let dmgText = '';
     if (dmg > 0 || snap) {
       game.hull = Math.max(0, game.hull - dmg); game.dmgTotal += dmg;
+      achieve('damage');
       dmgText = `Hard landing: ${dmg} damage${tiltDmg ? ` (${tiltDmg} from the tilt)` : ''}, hull ${game.hull}/${game.hullMax}.`;
       if (!game.legGone && (snap || game.dmgTotal >= CFG.legLossAt)) {
         game.legGone = snap ? legSide : (Math.random() < 0.5 ? -1 : 1);
+        achieve('leg');
         dmgText += ` The ${game.legGone < 0 ? 'left' : 'right'} leg broke off.`;
       }
       const got = rollFaults(dmg);
@@ -948,6 +1039,7 @@ button.primary { border-width: 2.5px; }
     const close = d >= DEBRIS ? Math.round(PTS.closeMax * (REACH - d) / (REACH - DEBRIS)) : 0;
     const pts = safe * PTS.safe + h.injured * PTS.injured + h.killed * PTS.killed + Math.max(0, close);
     game.score += pts; game.picked.add(flat);
+    achieve('team'); if (game.picked.size === SITES.length) achieve('allTeams');
     const upText = giveUpgrade();
     startBoarding(flat, safe, h.injured);
     game.tally.safe += safe; game.tally.injured += h.injured; game.tally.killed += h.killed;
@@ -967,7 +1059,7 @@ button.primary { border-width: 2.5px; }
     showEnd('Out of fuel', game.mode === 'mission' && game.cp ? `Press Space to restart from the ${game.cp.site.name.toLowerCase()} shelter, or R to restart the mission.` : 'Press Space to try again.');
   }
   function missionComplete() {
-    game.state = 'done'; hideToast();
+    game.state = 'done'; hideToast(); achieve('complete');
     showEnd('Mission complete', 'Press Space to fly again.', { results: [
       ['Safe', game.tally.safe], ['Injured', game.tally.injured], ['Killed', game.tally.killed],
       ['Fuel left', Math.ceil(game.fuel) + '%'], ['Hull', game.hull + '/' + game.hullMax], ['Time', fmtTime(game.time)], ['Score', game.score]
@@ -1047,7 +1139,7 @@ button.primary { border-width: 2.5px; }
   function updateView() {
     updateViewXY();
     // the closest view and the shelter zoom are the exceptions: they stay where they were placed
-    if (CENTER_Y && game.state !== 'over' && !(view.close && view.fixedY)) view.y = s.y - (pxH / view.scale) / 2;
+    if (CENTER_Y && game.state !== 'over' && !(view.close && view.fixedY)) view.y = (emergeNow() ? BASE.y + 3.5 : s.y) - (pxH / view.scale) / 2;   // leaving the base: held where the ship will stop
   }
   function updateViewXY() {
     if (game.state === 'flying' || game.state === 'ready') {
@@ -1149,14 +1241,42 @@ button.primary { border-width: 2.5px; }
   }
 
   function drawBase() {
-    const a = SX(BASE.x1), b = SX(BASE.x2), gy = SY(BASE.y), mid = (a + b) / 2;
-    stroke(() => { ctx.moveTo(a, gy + 2); ctx.lineTo(b, gy + 2); }, 6);
-    const h = Math.max(30, 18 * view.scale);
-    ctx.beginPath(); ctx.moveTo(b - 6, gy - h); ctx.lineTo(b - 6 - h * .4, gy - h * .85); ctx.lineTo(b - 6, gy - h * .7); ctx.closePath();
+    const D = DOME, k = view.scale, gy = SY(D.top), E = emergeNow(), hh = D.hatch / 2, o = E ? E.open : 0;
+    // faint panel lines so the dome reads as a building: a ring halfway up and four meridians (close views only)
+    if (k > 1.5) {
+      const rAt = y => Math.sqrt(Math.max(0, D.R ** 2 - (y - D.yc) ** 2));
+      ctx.save(); ctx.globalAlpha = 0.35; ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1; ctx.beginPath();
+      const ry = (D.y + D.top) / 2, rr = rAt(ry);
+      ctx.moveTo(SX(D.c - rr), SY(ry)); ctx.lineTo(SX(D.c + rr), SY(ry));
+      for (const f of [-0.7, -0.35, 0.35, 0.7]) {
+        for (let j = 0; j <= 40; j++) { const y = D.top - (D.top - D.y) * j / 40, x = D.c + f * rAt(y); j ? ctx.lineTo(SX(x), SY(y)) : ctx.moveTo(SX(x), SY(y)); }
+      }
+      ctx.stroke(); ctx.restore();
+    }
+    // the landing pad: thick, top edge on the surface; the hatch doors in the middle slide back into the roof
+    if (o > 0) {
+      const a = SX(D.c - hh * o), w = 2 * hh * o * k, bot = SY(D.top - EMERGE.depth - 3);
+      ctx.fillStyle = '#000000'; ctx.fillRect(a, gy - 3, w, bot - gy + 3);   // the open hatch and the shaft below
+      ctx.save(); ctx.beginPath(); ctx.rect(a, gy - 3, w, bot - gy + 3); ctx.clip();
+      ctx.save(); ctx.globalAlpha = 0.6;
+      stroke(() => { for (const sx of [D.c - hh + 0.3, D.c + hh - 0.3]) { ctx.moveTo(SX(sx), gy); ctx.lineTo(SX(sx), bot); } }, 1);   // shaft walls
+      ctx.restore();
+      const ly = SY(E.lift);
+      stroke(() => { ctx.moveTo(SX(D.c - hh + 0.6), ly + 2); ctx.lineTo(SX(D.c + hh - 0.6), ly + 2); }, 6);   // the lift platform
+      stroke(() => { for (const px of [-2.5, 2.5]) { ctx.moveTo(SX(D.c + px), ly + 5); ctx.lineTo(SX(D.c + px), bot); } }, 1);   // its rams
+      ctx.restore();
+    }
+    stroke(() => {
+      ctx.moveTo(SX(BASE.x1), gy + 2); ctx.lineTo(SX(D.c - hh * o), gy + 2);
+      ctx.moveTo(SX(D.c + hh * o), gy + 2); ctx.lineTo(SX(BASE.x2), gy + 2);
+    }, 6);
+    // flag on the ground beside the dome
+    const fx = SX(D.x2 + 10), fgy = SY(groundAt(D.x2 + 10)), h = Math.max(30, 18 * k);
+    ctx.beginPath(); ctx.moveTo(fx, fgy - h); ctx.lineTo(fx - h * .4, fgy - h * .85); ctx.lineTo(fx, fgy - h * .7); ctx.closePath();
     ctx.fillStyle = '#000000'; ctx.fill();   // the flag is solid: nothing shows through it
-    stroke(() => { ctx.moveTo(b - 6, gy); ctx.lineTo(b - 6, gy - h); ctx.lineTo(b - 6 - h * .4, gy - h * .85); ctx.lineTo(b - 6, gy - h * .7); });
+    stroke(() => { ctx.moveTo(fx, fgy); ctx.lineTo(fx, fgy - h); ctx.lineTo(fx - h * .4, fgy - h * .85); ctx.lineTo(fx, fgy - h * .7); });
     ctx.fillStyle = '#FFFFFF'; ctx.font = FONT; ctx.textAlign = 'center';
-    ctx.fillText('Base', mid, gy + 20);
+    ctx.fillText('Base', SX(D.c), SY(D.y) + 20);
   }
 
   function arrow(x0, y0, cx, cy, k, text, dy) {
@@ -1455,8 +1575,13 @@ button.primary { border-width: 2.5px; }
     drawDust();
     drawBoarders();
     if ((settings.edu || game.upg.has('path')) && (game.state === 'flying' || game.state === 'ready')) drawCoastPath();
-    const vecLabels = drawVectors();   // the arrows go behind the ship
-    drawShip();
+    const E = emergeNow();
+    const vecLabels = E ? [] : drawVectors();   // the arrows go behind the ship
+    if (E) {   // still inside the base: only the part above the roof or in the open hatch shows
+      const hh = DOME.hatch / 2 * E.open, gy = SY(DOME.top);
+      ctx.save(); ctx.beginPath(); ctx.rect(-10, -10, pxW + 20, gy + 9); ctx.rect(SX(DOME.c - hh), gy - 3, 2 * hh * view.scale, pxH); ctx.clip();
+      drawShip(); ctx.restore();
+    } else drawShip();
     drawLabels(vecLabels);               // their labels go on top
     drawTargetPointer();
 
@@ -1645,7 +1770,7 @@ button.primary { border-width: 2.5px; }
     else if (lowFuel) w.textContent = game.fuel <= 0 ? 'Out of fuel' : 'Low on fuel';
     w.classList.toggle('off', !(danger || lowFuel) || (flash % 0.5) > 0.3);
     if (settings.edu) drawFBD();
-    drawMinimap();
+    drawMinimap(); placeAch();
   }
 
   // ---------- loop ----------
@@ -1685,7 +1810,7 @@ button.primary { border-width: 2.5px; }
   function fromCheckpoint() {
     const cp = game.cp;
     if (!cp || game.mode !== 'mission') return again();
-    setup('mission');
+    setup('mission'); game.emerge = null; game.state = 'landed';
     Object.assign(game, { score: cp.score, tally: { ...cp.tally }, picked: new Set(cp.picked), fuel: cp.fuel, time: cp.time, cp });
     Object.assign(s, { x: cp.x, y: cp.site.y + 3.5, vx: 0, vy: 0, rot: 0, ax: 0, ay: 0, alt: 0 });
     Object.assign(game, { hull: cp.hull, hullMax: cp.hullMax, dmgTotal: cp.dmgTotal, upg: new Set(cp.upg), repairLeft: cp.repairLeft, repairTotal: cp.repairTotal, legGone: cp.legGone, faults: { ...cp.faults }, lifeLeft: cp.lifeLeft });
@@ -1845,7 +1970,7 @@ button.primary { border-width: 2.5px; }
     Object.assign(s, { x, y: Math.max(y, groundAt(x) + 3.6), vx: devPlace.vx, vy: devPlace.vy, rot: devPlace.tilt, ax: 0, ay: 0 });
     s.alt = s.y - 3.5 - groundAt(s.x);
     game.fuel = devPlace.fuel; game.hull = Math.min(game.hullMax, devPlace.hull);
-    game.state = 'flying'; game.liftLock = false; game.launching = false; game.topple = null; game.paused = true;
+    game.state = 'flying'; game.emerge = null; game.liftLock = false; game.launching = false; game.topple = null; game.paused = true;
     view.close = false; view.landing = false; view.place = true; view.resetY = true;
     buildDev();
   });
