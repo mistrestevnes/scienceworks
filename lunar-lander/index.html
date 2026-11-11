@@ -161,10 +161,11 @@ button.primary { border-width: 2.5px; }
   border: 1.5px solid var(--line); background: var(--bg);
 }
 .fbd {
-  position: absolute; top: 108px; left: 14px; border: 1.5px solid var(--line); background: var(--bg);
-  padding: 8px 12px; display: grid; gap: 4px; font-size: 14px; font-variant-numeric: tabular-nums;
+  position: absolute; top: 200px; left: 14px; border: 1.5px solid var(--line); background: var(--bg);   /* left, under the hull box */
+  padding: 8px 12px; display: grid; font-size: 15px;
 }
-.fbd canvas { width: 170px; height: 230px; display: block; justify-self: center; }
+.fbd canvas { width: 270px; height: 270px; display: block; }
+.fbd .rows { display: none; }   /* the diagram only; the numbers are not shown */
 .fbd .row { display: flex; justify-content: space-between; gap: 14px; white-space: nowrap; }
 
 .toast {
@@ -232,12 +233,14 @@ button.primary { border-width: 2.5px; }
     <canvas id="cv"></canvas>
 
     <div class="fbd" id="fbd" hidden aria-label="Forces on the ship">
-      <canvas id="fbdCanvas" width="340" height="460" aria-hidden="true"></canvas>
+      <canvas id="fbdCanvas" width="500" height="500" aria-hidden="true"></canvas>
+      <div class="rows">
       <div class="row"><span>Thrust</span><span id="fThrust">0 N</span></div>
       <div class="row"><span>Weight</span><span id="fWeight">0 N</span></div>
       <div class="row"><span>Net force</span><span id="fNet">0 N</span></div>
       <div class="row"><span>Mass</span><span id="fMass">0 kg</span></div>
       <div class="row"><span>a = F / m</span><span id="fA">0 m/s/s</span></div>
+      </div>
     </div>
 
     <div class="toast" id="toast" hidden></div>
@@ -281,6 +284,8 @@ button.primary { border-width: 2.5px; }
         <b>Space</b><span>start, pause</span>
         <b>R</b><span>restart</span>
         <b>V</b><span>velocity components on, off</span>
+        <b>A</b><span>acceleration components on, off</span>
+        <b>F</b><span>forces diagram; again for components</span>
       </div>
       <div class="results" id="ovResults" hidden></div>
       <div class="graphs" id="ovGraphs" hidden>
@@ -293,13 +298,14 @@ button.primary { border-width: 2.5px; }
           <button data-practice="0">Plateau</button><button data-practice="1">Ravine</button><button data-practice="2">Mountain</button><button data-practice="3">Ledge</button><button data-practice="4">Crater</button>
         </div>
         <div class="btnrow"><span class="lbl">Educational mode:</span><button id="bEdu" aria-pressed="false">Off</button>
-          <span class="lbl" style="margin-left:14px">Velocity components (V):</span><button id="bComp" aria-pressed="false">Off</button>
           <span class="lbl" style="margin-left:14px">Touch controls:</span><button id="bTouch" aria-pressed="false">Off</button></div>
+        <div class="btnrow"><span class="lbl">Velocity components (V):</span><button id="bComp" aria-pressed="false">Off</button>
+          <span class="lbl" style="margin-left:14px">Acceleration components (A):</span><button id="bAComp" aria-pressed="false">Off</button></div>
         <div class="btnrow" id="eduOpts" hidden>
           <span class="lbl">World:</span><button data-world="Moon" aria-pressed="true">Moon</button><button data-world="Mars" aria-pressed="false">Mars</button><button data-world="Ceres" aria-pressed="false">Ceres</button>
           <span class="lbl" style="margin-left:10px">Mass:</span><button id="bMass" aria-pressed="true">Changes as fuel burns</button>
         </div>
-        <div class="ver">Version 100</div>
+        <div class="ver">Version 105</div>
       </div>
       <div class="btnrow" id="ovButtons" hidden>
         <button class="primary" id="bAgain">Try again</button><button id="bRestart" hidden>Restart mission</button><button id="bContinue" hidden>Continue</button><button id="bMenu">Main menu</button>
@@ -334,6 +340,7 @@ button.primary { border-width: 2.5px; }
     // the walk to the ship: a torn suit has 20-40 s of air; someone who collapses dies unless aboard within 10 s
     airMin: 20, airMax: 40, downLimit: 10, carryV: 0.6,
     // radiation (solar storm): dose per second in each place; radiation sickness at sickAt; points lost per sick person
+    aScale: 24,   // px per m/s/s for the a arrow in the far view (grows as the view zooms in)
     radShelter: 0.01, radIn: 0.03, radOut: 0.4, sickAt: 30, radPts: 30
   };
   let CFG = JSON.parse(JSON.stringify(CFG_DEFAULT));
@@ -368,7 +375,8 @@ button.primary { border-width: 2.5px; }
   const LEG = 4.25;               // half the distance between Grace's front footpads, m
   // arrow lengths grow as the view zooms in: these are the lengths in the far view (px per m/s, px per m/s/s);
   // the close view (5x closer) draws them 5x longer, the landing view 10x
-  const V_REF = 4, A_REF = 12;   // the a arrow uses its own, larger scale so it reads clearly
+  const V_REF = 4;               // the a arrow uses its own, larger scale (CFG.aScale) so it reads clearly
+  const VCOL = '#4DB8FF', ACOL = '#FF9F1C', FCOL = '#5EE08A';   // force arrows (free body diagram) green   // v arrows blue, a arrows orange (both stay distinct for colour-blind viewers)
   const arrowZoom = () => FAR_H / (pxH / view.scale);
 
   // ---------- pickups ----------
@@ -624,7 +632,8 @@ button.primary { border-width: 2.5px; }
   const $ = id => document.getElementById(id);
   let pxW = 0, pxH = 0, dpr = 1;
   const keys = new Set();
-  const settings = { edu: false, world: 'Moon', varMass: true, vcomp: false };
+  const settings = { edu: false, world: 'Moon', varMass: true, vcomp: false, acomp: false, fbd: 0 };   // fbd: 0 off, 1 on, 2 with components
+  const fbdOn = () => settings.edu || settings.fbd > 0;
   let game, s, view = { x: 0, y: 0, scale: 1, zoomed: false, level: 3 }, toastTimer = null;
   let grav = WORLDS.Moon;
 
@@ -674,7 +683,7 @@ button.primary { border-width: 2.5px; }
     view.resetY = true; view.place = true; view.landing = false; view.lvl = 0;
     setScale(); view.x = s.x - pxW / (view.scale || 1) * 0.5;
     hideToast();
-    $('fbd').hidden = !settings.edu;
+    $('fbd').hidden = !fbdOn();
     updateView();
   }
 
@@ -1673,17 +1682,18 @@ button.primary { border-width: 2.5px; }
         for (const c of parts) {
           const inv = flashing.includes(c);
           if (inv) c.L.color = '#000000';
-          drawArrow(VX, Y0, c.x1, c.y1, { w: 2.5, head: 14, color: inv ? '#000000' : '#FFFFFF' });
+          drawArrow(VX, Y0, c.x1, c.y1, { w: 2.5, head: 14, color: inv ? '#000000' : VCOL });
+          if (!inv) c.L.color = VCOL;
           labels.push(c.L);
         }
       } else {
         if (comps) {
-          ctx.save(); ctx.globalAlpha = 0.4; ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1; ctx.setLineDash([5, 6]);
+          ctx.save(); ctx.globalAlpha = 0.4; ctx.strokeStyle = VCOL; ctx.lineWidth = 1; ctx.setLineDash([5, 6]);
           ctx.beginPath(); ctx.moveTo(VX + fx, Y0 + fy); ctx.lineTo(VX + fx, Y0); ctx.moveTo(VX + fx, Y0 + fy); ctx.lineTo(VX, Y0 + fy); ctx.stroke(); ctx.restore();
-          drawArrow(VX, Y0, VX + fx, Y0, { ...COMP, w: 1.6, head: 13 });
-          drawArrow(VX, Y0, VX, Y0 + fy, { ...COMP, w: 1.6, head: 13 });
+          drawArrow(VX, Y0, VX + fx, Y0, { ...COMP, w: 1.6, head: 13, color: VCOL });
+          drawArrow(VX, Y0, VX, Y0 + fy, { ...COMP, w: 1.6, head: 13, color: VCOL });
         }
-        drawArrow(VX, Y0, VX + fx, Y0 + fy, { w: 3, head: 16 });
+        drawArrow(VX, Y0, VX + fx, Y0 + fy, { w: 3, head: 16, color: VCOL });
         const down = fy >= 0, right = fx >= 0;
         // short names on the arrows
         if (comps && Math.abs(fx) >= 20) labels.push(mkLabel('v', 'x', '', F, VX + fx / 2, Y0 + (down ? -F * 0.8 : F * 0.8), 'center'));
@@ -1695,30 +1705,35 @@ button.primary { border-width: 2.5px; }
         const rows = comps ? [['', vText], ['x', ' = ' + sgn(s.vx) + ' m/s'], ['y', ' = ' + sgn(s.vy) + ' m/s']] : [['', vText]];
         const by = Math.max(F * 1.6, Math.min(pxH - F * 4.5, Y0 + fy / 2 - F * 1.3 * (rows.length - 1) / 2));
         rows.forEach(([sub, t], n) => labels.push(mkLabel('v', sub, t, F, bx, by + n * F * 1.3, 'left')));
+        labels.forEach(L => { L.color = VCOL; });
       }
       // no a arrow in the closest view: near the ground only velocity matters (a is shown in the other views)
-      ctx.save(); ctx.fillStyle = '#FFFFFF';
+      ctx.save(); ctx.fillStyle = VCOL;
       ctx.beginPath(); ctx.arc(VX, Y0, 3, 0, Math.PI * 2); ctx.fill(); ctx.restore();
       return labels;
     }
 
     // ----- far and close views: out of the hull
-    const VS = V_REF * arrowZoom(), AS = A_REF * arrowZoom(), F = 14;
+    const VS = V_REF * arrowZoom(), AS = CFG.aScale * arrowZoom(), F = 14;
     let vBase = [cx, cy], vTip = null;
     if (v * VS >= 4) {
       const ux = s.vx / v, uy = -s.vy / v;
       vBase = hullEdge(cx, cy, ux, uy, k); vTip = [vBase[0] + ux * v * VS, vBase[1] + uy * v * VS];
       if (settings.vcomp) {
-        drawArrow(vBase[0], vBase[1], vBase[0] + s.vx * VS, vBase[1], COMP);
-        drawArrow(vBase[0], vBase[1], vBase[0], vBase[1] - s.vy * VS, COMP);
+        drawArrow(vBase[0], vBase[1], vBase[0] + s.vx * VS, vBase[1], { ...COMP, color: VCOL });
+        drawArrow(vBase[0], vBase[1], vBase[0], vBase[1] - s.vy * VS, { ...COMP, color: VCOL });
       }
-      drawArrow(vBase[0], vBase[1], vTip[0], vTip[1], { w: 1.5 });
+      drawArrow(vBase[0], vBase[1], vTip[0], vTip[1], { w: 1.8, color: VCOL });
     }
-    let aTip = null;
+    let aTip = null, aBase = null;
     if (a * AS >= 4) {
       const ux = s.ax / a, uy = -s.ay / a, b = hullEdge(cx, cy, ux, uy, k);
-      aTip = [b[0] + ux * a * AS, b[1] + uy * a * AS];
-      drawArrow(b[0], b[1], aTip[0], aTip[1], { w: 1.2, alpha: 0.75, dash: [1, 5] });
+      aBase = b; aTip = [b[0] + ux * a * AS, b[1] + uy * a * AS];
+      if (settings.acomp) {
+        drawArrow(b[0], b[1], b[0] + s.ax * AS, b[1], { ...COMP, color: ACOL });
+        drawArrow(b[0], b[1], b[0], b[1] - s.ay * AS, { ...COMP, color: ACOL });
+      }
+      drawArrow(b[0], b[1], aTip[0], aTip[1], { w: 1.8, color: ACOL });
     }
     // labels just beyond each tip, off the craft
     const shipR = 6.5 * k + 10;
@@ -1738,11 +1753,18 @@ button.primary { border-width: 2.5px; }
       }
       return L0;
     };
-    labels.push(beyond(vTip, 'v', '', vText), beyond(aTip, 'a', '', aText));
+    const Lv = beyond(vTip, 'v', '', vText), La = beyond(aTip, 'a', '', aText);
+    Lv.color = VCOL; La.color = ACOL;
+    labels.push(Lv, La);
     if (settings.vcomp && vTip) {
       const hx = s.vx * VS, hy = -s.vy * VS;
-      if (Math.abs(hx) >= 4) labels.push(mkLabel('v', 'x', ' = ' + sgn(s.vx) + ' m/s', F, vBase[0] + hx + (hx > 0 ? 8 : -8), vBase[1], hx > 0 ? 'left' : 'right'));
-      if (Math.abs(hy) >= 4) labels.push(mkLabel('v', 'y', ' = ' + sgn(s.vy) + ' m/s', F, vBase[0], vBase[1] + hy + (hy > 0 ? F : -F), 'center'));
+      if (Math.abs(hx) >= 4) labels.push({ ...mkLabel('v', 'x', ' = ' + sgn(s.vx) + ' m/s', F, vBase[0] + hx + (hx > 0 ? 8 : -8), vBase[1], hx > 0 ? 'left' : 'right'), color: VCOL });
+      if (Math.abs(hy) >= 4) labels.push({ ...mkLabel('v', 'y', ' = ' + sgn(s.vy) + ' m/s', F, vBase[0], vBase[1] + hy + (hy > 0 ? F : -F), 'center'), color: VCOL });
+    }
+    if (settings.acomp && aTip) {
+      const hx = s.ax * AS, hy = -s.ay * AS;
+      if (Math.abs(hx) >= 4) labels.push({ ...mkLabel('a', 'x', ' = ' + sgn(s.ax) + ' m/s/s', F, aBase[0] + hx + (hx > 0 ? 8 : -8), aBase[1], hx > 0 ? 'left' : 'right'), color: ACOL });
+      if (Math.abs(hy) >= 4) labels.push({ ...mkLabel('a', 'y', ' = ' + sgn(s.ay) + ' m/s/s', F, aBase[0], aBase[1] + hy + (hy > 0 ? F : -F), 'center'), color: ACOL });
     }
     return separate(labels, cy);
   }
@@ -1919,25 +1941,44 @@ button.primary { border-width: 2.5px; }
     $('fA').textContent = (onGround ? 0 : Math.hypot(Nx, Ny) / m).toFixed(2) + ' m/s/s';
 
     // one fixed scale (N per pixel) so arrow lengths can be compared; dot at 60% height
-    const Wd = fbdC.width, Hd = fbdC.height, cx = Wd * 0.42, cy = Hd * 0.6;
-    const k = Math.min(0.55 * Hd / CFG.thrust, 0.34 * Hd / W);
+    // one fixed scale (full thrust plus weight fills 80% of the box), the drawing centred in the square box
+    const Wd = fbdC.width, Hd = fbdC.height, FO = 0;   // all forces, Fnet included, start at the dot
+    const k = 0.94 * Hd / (CFG.thrust + W);
+    const xs = [0, Tx * k, FO, FO + Nx * k], ys = [0, -Ty * k, W * k, -Ny * k];
+    const cx = Wd / 2 - (Math.min(...xs) + Math.max(...xs)) / 2, cy = Hd / 2 - (Math.min(...ys) + Math.max(...ys)) / 2;
     fctx.setTransform(1, 0, 0, 1, 0, 0); fctx.clearRect(0, 0, Wd, Hd);
-    fctx.fillStyle = '#FFFFFF'; fctx.font = '24px "Share Tech Mono", monospace';
+    fctx.fillStyle = '#FFFFFF'; fctx.font = '34px "Share Tech Mono", monospace';
     fctx.beginPath(); fctx.arc(cx, cy, 8, 0, Math.PI * 2); fctx.fill();
     const arr = (ox, fx, fy, label, dash) => {
       const len = Math.hypot(fx, fy) * k; if (len < 3) return;
       const x1 = ox + fx * k, y1 = cy - fy * k, ang = Math.atan2(y1 - cy, x1 - ox), hd = Math.min(18, len * .4);
-      fctx.save(); fctx.setLineDash(dash);
-      stroke(() => { fctx.moveTo(ox, cy); fctx.lineTo(x1, y1); }, 4, fctx);
+      fctx.save(); fctx.strokeStyle = FCOL; fctx.lineWidth = 5; fctx.lineCap = 'round'; fctx.lineJoin = 'round';   // force arrows blue
+      fctx.setLineDash(dash); fctx.beginPath(); fctx.moveTo(ox, cy); fctx.lineTo(x1, y1); fctx.stroke();
       fctx.setLineDash([]);
-      stroke(() => { fctx.moveTo(x1 - hd * Math.cos(ang - .45), y1 - hd * Math.sin(ang - .45)); fctx.lineTo(x1, y1); fctx.lineTo(x1 - hd * Math.cos(ang + .45), y1 - hd * Math.sin(ang + .45)); }, 4, fctx);
+      fctx.beginPath(); fctx.moveTo(x1 - hd * Math.cos(ang - .45), y1 - hd * Math.sin(ang - .45)); fctx.lineTo(x1, y1); fctx.lineTo(x1 - hd * Math.cos(ang + .45), y1 - hd * Math.sin(ang + .45)); fctx.stroke();
       fctx.textAlign = 'left';
       fctx.fillText(label, Math.min(Wd - 70, x1 + 12), Math.min(Hd - 6, Math.max(22, y1 + (fy > 0 ? 8 : 4))));
       fctx.restore();
     };
     arr(cx, 0, -W, 'W', []);
     if (onGround) arr(cx, 0, W, 'N', []);
-    else { arr(cx, Tx, Ty, 'T', []); arr(cx + 70, Nx, Ny, 'Fnet', [12, 9]); }
+    else { arr(cx, Tx, Ty, 'T', []); arr(cx + FO, Nx, Ny, 'Fnet', [12, 9]); }
+    // second press of F: the x and y components of thrust and of the net force, thin and dotted
+    if (settings.fbd === 2 && !onGround) {
+      fctx.save(); fctx.lineWidth = 2.5; fctx.font = '26px "Share Tech Mono", monospace';
+      const comp = (ox, fx, fy, label) => {
+        const len = Math.hypot(fx, fy) * k; if (len < 6) return;
+        const x1 = ox + fx * k, y1 = cy - fy * k, ang = Math.atan2(y1 - cy, x1 - ox), hd = Math.min(12, len * .4);
+        fctx.strokeStyle = FCOL; fctx.setLineDash([3, 7]); fctx.beginPath(); fctx.moveTo(ox, cy); fctx.lineTo(x1, y1); fctx.stroke(); fctx.setLineDash([]);
+        fctx.beginPath(); fctx.moveTo(x1 - hd * Math.cos(ang - .45), y1 - hd * Math.sin(ang - .45)); fctx.lineTo(x1, y1); fctx.lineTo(x1 - hd * Math.cos(ang + .45), y1 - hd * Math.sin(ang + .45)); fctx.stroke();
+        fctx.fillStyle = '#FFFFFF'; fctx.textAlign = fx < 0 ? 'right' : 'left';
+        const lx = fy === 0 ? x1 + (fx < 0 ? -8 : 8) : x1 + 8, ly = fy === 0 ? cy - 10 : y1 + (fy > 0 ? 18 : -6);
+        fctx.fillText(label, Math.max(4, Math.min(Wd - 4, lx)), Math.min(Hd - 6, Math.max(20, ly)));
+      };
+      // weight has no x part, so the x parts of thrust and of the net force are the same arrow
+      comp(cx, Tx, 0, 'Tx = Fx'); comp(cx, 0, Ty, 'Ty'); comp(cx, 0, Ny, 'Fy');
+      fctx.restore();
+    }
   }
 
   // ---------- P/T and V/T graphs (educational mode) ----------
@@ -2030,7 +2071,7 @@ button.primary { border-width: 2.5px; }
       $('faults').dataset.t = ft; $('faults').innerHTML = '';
       for (const l of lines) { const d = document.createElement('div'); d.textContent = l; $('faults').append(d); }
     }
-    $('fbd').style.top = ($('hullBox').offsetTop + $('hullBox').offsetHeight + 8) + 'px';
+    { const top = ($('hullBox').offsetTop + $('hullBox').offsetHeight + 8) + 'px'; if ($('fbd').style.top !== top) $('fbd').style.top = top; }   // under the hull box
     $('heatWrap').hidden = !F.coolant;
     $('heatFill').style.width = Math.round(game.heat * 100) + '%';
     $('rHeat').textContent = game.overheat ? 'HOT' : Math.round(game.heat * 100) + '%';
@@ -2049,7 +2090,7 @@ button.primary { border-width: 2.5px; }
     if (danger) w.textContent = 'Altitude warning: too fast';
     else if (lowFuel) w.textContent = game.fuel <= 0 ? 'Out of fuel' : 'Low on fuel';
     w.classList.toggle('off', !(danger || lowFuel) || (flash % 0.5) > 0.3);
-    if (settings.edu) drawFBD();
+    if (fbdOn() && game.state !== 'intro') drawFBD();
     drawMinimap(); placeAch();
   }
 
@@ -2125,6 +2166,9 @@ button.primary { border-width: 2.5px; }
     else if (e.key.toLowerCase() === 'w' && !e.repeat && live()) setMain(true);
     else if (e.key.toLowerCase() === 'r' && !e.repeat && game.state !== 'intro') again();
     else if (e.key.toLowerCase() === 'v' && !e.repeat) toggleComp();
+    else if (e.key.toLowerCase() === 'a' && !e.repeat) toggleAComp();
+    // F: free body diagram on, then with components, then off
+    else if (e.key.toLowerCase() === 'f' && !e.repeat && game.state !== 'intro') { settings.fbd = (settings.fbd + 1) % 3; $('fbd').hidden = !fbdOn(); }
   });
   window.addEventListener('keyup', e => { keys.delete(e.key); if (e.key.toLowerCase() === 'w') setMain(false); });
   window.addEventListener('blur', () => {
@@ -2138,7 +2182,7 @@ button.primary { border-width: 2.5px; }
   $('bEdu').addEventListener('click', () => {
     settings.edu = !settings.edu;
     $('bEdu').textContent = settings.edu ? 'On' : 'Off'; $('bEdu').setAttribute('aria-pressed', settings.edu);
-    $('eduOpts').hidden = !settings.edu; $('fbd').hidden = !settings.edu; refreshGoal();
+    $('eduOpts').hidden = !settings.edu; $('fbd').hidden = !fbdOn() || game.state === 'intro'; refreshGoal();
   });
   document.querySelectorAll('[data-world]').forEach(b => b.addEventListener('click', () => {
     settings.world = b.dataset.world;
@@ -2150,6 +2194,11 @@ button.primary { border-width: 2.5px; }
     $('bComp').textContent = settings.vcomp ? 'On' : 'Off'; $('bComp').setAttribute('aria-pressed', settings.vcomp);
   }
   $('bComp').addEventListener('click', toggleComp);
+  function toggleAComp() {
+    settings.acomp = !settings.acomp;
+    $('bAComp').textContent = settings.acomp ? 'On' : 'Off'; $('bAComp').setAttribute('aria-pressed', settings.acomp);
+  }
+  $('bAComp').addEventListener('click', toggleAComp);
   $('bMass').addEventListener('click', () => {
     settings.varMass = !settings.varMass;
     $('bMass').textContent = settings.varMass ? 'Changes as fuel burns' : 'Constant';
@@ -2181,7 +2230,7 @@ button.primary { border-width: 2.5px; }
     injLarge: 'Injury chance, large grain (%)', faceplate: 'Faceplate cracks, large grain (%)', injMed: 'Injury chance, medium grain (%)', injSmall: 'Injury chance, small grain (%)',
     suitTear: 'Injuries that tear the suit (%)', zClose: 'Small+medium grains, under 30 m (x)', zPacked: 'Small+medium grains, packed ground (x)', zLoose: 'Small+medium grains, loose ground (x)',
     airMin: 'Torn suit: least air (s)', airMax: 'Torn suit: most air (s)', downLimit: 'Collapsed: dies after (s)', carryV: 'Carrying speed (m/s)',
-    radShelter: 'Radiation in a shelter (per s)', radIn: 'Radiation in the ship (per s)', radOut: 'Radiation outside (per s)', sickAt: 'Radiation sickness at (dose)', radPts: 'Points lost per sick person'
+    aScale: 'a arrow length, far view (px per m/s/s)', radShelter: 'Radiation in a shelter (per s)', radIn: 'Radiation in the ship (per s)', radOut: 'Radiation outside (per s)', sickAt: 'Radiation sickness at (dose)', radPts: 'Points lost per sick person'
   };
   const devPlace = { vx: 0, vy: -1, tilt: 0, fuel: 100, hull: 60, armed: false };
   function buildDev() {
