@@ -121,6 +121,7 @@ button.primary { border-width: 2.5px; }
   border: 1.5px solid var(--line); background: var(--bg); padding: 6px 12px; font-size: 15px;
 }
 .fuelbox { display: grid; gap: 4px; align-items: start; }
+.ver { font: 14px Helvetica, Arial, sans-serif; color: #BBBBBB; margin-top: 4px; }
 .fuelbox .top { display: flex; align-items: center; gap: 10px; }
 #rMass, #rDv { font-variant-numeric: tabular-nums; }
 .fuelbox .bar { width: 160px; height: 14px; border: 1.5px solid var(--line); padding: 2px; }
@@ -298,6 +299,7 @@ button.primary { border-width: 2.5px; }
           <span class="lbl">World:</span><button data-world="Moon" aria-pressed="true">Moon</button><button data-world="Mars" aria-pressed="false">Mars</button><button data-world="Ceres" aria-pressed="false">Ceres</button>
           <span class="lbl" style="margin-left:10px">Mass:</span><button id="bMass" aria-pressed="true">Changes as fuel burns</button>
         </div>
+        <div class="ver">Version 100</div>
       </div>
       <div class="btnrow" id="ovButtons" hidden>
         <button class="primary" id="bAgain">Try again</button><button id="bRestart" hidden>Restart mission</button><button id="bContinue" hidden>Continue</button><button id="bMenu">Main menu</button>
