@@ -82,6 +82,23 @@ canvas#cv { display: block; width: 100%; height: 100%; }
 .nav .big { font-size: 30px; line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .nav .small { font-size: 16px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
+.coursebox { position: absolute; left: 24px; right: 24px; top: 24px; bottom: 24px; display: grid;
+  grid-template-rows: auto auto auto auto auto auto auto 1fr auto; gap: 6px; padding: 10px 20px; z-index: 5; }
+.coursebox h2 { font-weight: 400; font-size: 1.5rem; margin: 0; letter-spacing: .08em; }
+.coursebox canvas { width: 100%; height: 100%; min-height: 0; border: 1.5px solid var(--line); }
+#cAll, #cOver { height: 84px; touch-action: none; }
+#cAll { cursor: ew-resize; }
+#cOver { cursor: pointer; }
+.coursebox .cbar { display: flex; gap: 22px; align-items: center; font-size: 18px; flex-wrap: wrap; }
+.coursebox .cbar .sp { flex: 1; }
+.coursebox .cbar input[type=range] { width: 150px; vertical-align: middle; }
+.coursebox .fbtn { border: 1.5px solid var(--line); padding: 4px 12px; cursor: pointer; }
+#cDetail { cursor: crosshair; touch-action: none; position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+.cwrap { position: relative; min-height: 140px; overflow: hidden; }
+.coursebox { overflow-y: auto; }
+.coursebox .cbar { row-gap: 4px; }
+.coursebox select { font-size: 18px; }
+.coursebox .cfoot { display: flex; justify-content: space-between; align-items: center; font-size: 18px; padding-bottom: 6px; }
 .overlay {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
   width: min(860px, calc(100% - 48px)); max-height: calc(100% - 20px); overflow-y: auto; text-align: center;
@@ -89,7 +106,7 @@ canvas#cv { display: block; width: 100%; height: 100%; }
 }
 .overlay h2 { font-weight: 400; font-size: 1.5rem; margin: 0; letter-spacing: .08em; }
 .keyline { display: grid; grid-template-columns: auto auto auto auto; gap: 4px 14px; text-align: left; font-size: 15px; }
-#ovGoal { font-size: 15px; max-width: 78ch; }
+#ovGoal { font-size: 18px; max-width: 70ch; white-space: pre-line; text-align: left; margin: 0; }
 #ovHover { font-size: 15px; max-width: 78ch; }
 .keyline b { font-weight: 400; }
 .results { display: grid; grid-template-columns: auto auto; gap: 4px 24px; text-align: left; font-variant-numeric: tabular-nums; }
@@ -121,7 +138,21 @@ button.primary { border-width: 2.5px; }
   border: 1.5px solid var(--line); background: var(--bg); padding: 6px 12px; font-size: 15px;
 }
 .fuelbox { display: grid; gap: 4px; align-items: start; }
-.ver { font: 14px Helvetica, Arial, sans-serif; color: #BBBBBB; margin-top: 4px; }
+.ver { font: 14px Helvetica, Arial, sans-serif; color: #BBBBBB; }
+/* first screen: the controls, keys drawn as key caps, larger text */
+#menu { width: 100%; justify-content: stretch; }
+.menufoot { justify-self: stretch; width: 100%; display: flex; justify-content: space-between; align-items: flex-end; margin-top: 6px; }
+.menufoot .lbl, .menufoot button { font-size: 20px; }
+.overlay.intro h2 { font-size: 2.2rem; }
+.overlay.intro .keyline { font-size: 22px; gap: 12px 18px; align-items: center; }
+.overlay.intro #bDetails { font-size: 20px; }
+.menufoot #bDemo, .menufoot #bReal, .menufoot #bBuild { font-size: 16px; margin-left: 14px; }
+.overlay.intro #bMission { font-size: 24px; padding: 8px 26px; animation: startflash 1s ease-in-out infinite; }
+#bMission { display: none; } .overlay.intro #bMission { display: inline-block; }
+@keyframes startflash { 50% { opacity: 0.3; } }
+.democtl button.flash { animation: startflash 1s ease-in-out infinite; }
+.keyline kbd { display: inline-block; min-width: 1.6em; padding: 2px 7px; margin-right: 6px; border: 1.5px solid var(--line); text-align: center; font: inherit; line-height: 1.3; }
+.overlay.intro #ovGoal { font-size: 20px; }
 .fuelbox .top { display: flex; align-items: center; gap: 10px; }
 #rMass, #rDv { font-variant-numeric: tabular-nums; }
 .fuelbox .bar { width: 160px; height: 14px; border: 1.5px solid var(--line); padding: 2px; }
@@ -210,6 +241,25 @@ button.primary { border-width: 2.5px; }
   width: 78px; height: 78px; font-size: 30px; padding: 0; line-height: 1;
   background: rgba(0, 0, 0, .45); border: 2px solid rgba(255, 255, 255, .75); color: #FFFFFF;
 }
+.app.demo #fuelBox, .app.demo #hullBox, .app.demo #pwBox, .app.demo #timeBox, .app.demo #heatWrap, .app.demo #altBig,
+.app.demo #warn, .app.demo .nav, .app.demo #bKbd, .app.demo #touchpad { display: none !important; }
+.app.demo #fbd { top: 14px !important; left: 14px; padding: 6px; }   /* demo: free body diagram at the top left, in kN */
+.app.demo .fbd canvas { width: 180px; height: 180px; }
+.democtl { position: absolute; right: 14px; top: 14px; z-index: 7; border: 1px solid var(--line); background: var(--bg); padding: 6px 8px; display: flex; gap: 6px; align-items: center; }
+.democtl button { font: inherit; font-size: 18px; color: var(--line); background: var(--bg); border: 1px solid var(--line); border-radius: 0; padding: 2px 9px; min-height: 32px; cursor: pointer; }
+.democtl button:disabled { opacity: .35; cursor: default; }
+.democtl button.main, .democtl button[aria-pressed="true"] { background: var(--line); color: var(--bg); }
+.democtl input[type=range] { width: 170px; accent-color: #FFFFFF; height: 24px; }
+.demotime { position: absolute; right: 18px; top: 10px; z-index: 7; display: flex; gap: 22px; align-items: baseline; color: #FFFFFF; font-size: 48px; line-height: 1; font-variant-numeric: tabular-nums; pointer-events: none; }
+.demotime #dTn { display: inline-block; min-width: 4ch; text-align: right; }
+.demotime #dT .u { margin-left: 0.1em; }
+.demotime #dX2 { font-size: 34px; color: #FFE014; animation: x2flash 0.8s steps(1) infinite; }
+.demotime [hidden] { display: none; }
+@keyframes x2flash { 50% { opacity: 0.15; } }
+.kbdswitch {
+  position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 6;
+  font: inherit; font-size: 18px; color: var(--line); background: var(--bg); border: 1.5px solid var(--line); border-radius: 0; padding: 6px 14px;
+}
 .touchpad button.down { background: #FFFFFF; color: #000000; }
 .touchpad #tL { left: 22px; bottom: 22px; }
 .touchpad #tR { left: 112px; bottom: 22px; }
@@ -266,6 +316,19 @@ button.primary { border-width: 2.5px; }
     <div class="msgbox" id="msgBox" hidden role="status"></div>
     <div class="ach" id="ach" hidden role="status"><div class="lbl">Achievement unlocked:</div><div class="name" id="achName"></div></div>
 
+    <button class="kbdswitch" id="bKbd" hidden>Use keyboard</button>
+    <div class="democtl" id="demoCtl" hidden>
+      <button class="main" id="dGo">Launch</button>
+      <button id="dShow" disabled>Visualize</button>
+      <button id="dReplay" disabled aria-label="Replay">↺</button>
+      <button id="dBack" disabled aria-label="Back one dot">‹</button>
+      <input type="range" id="dScrub" min="0" max="1000" value="0" disabled aria-label="Time">
+      <button id="dFwd" disabled aria-label="Forward one dot">›</button>
+      <button id="dA" aria-pressed="false">a</button>
+      <button id="dExit">Menu</button>
+    </div>
+    <div class="demotime" id="demoTime" hidden><span id="dX2" hidden>×2</span><span id="dT"><span id="dTn">0.0</span><span class="u">s</span></span></div>
+    </div>
     <div class="touchpad" id="touchpad" hidden>
       <button id="tL" aria-label="Rotate left">◀</button><button id="tR" aria-label="Rotate right">▶</button>
       <button id="tUp" aria-label="Throttle up">+</button><button id="tDn" aria-label="Throttle down">−</button>
@@ -273,39 +336,60 @@ button.primary { border-width: 2.5px; }
       <button id="tPause" aria-label="Pause">❚❚</button>
     </div>
     <div class="devpanel" id="dev" hidden aria-label="Dev panel"></div>
+    <div class="panel coursebox" id="course" hidden>
+      <div class="cbar"><h2>Course builder</h2><span id="cName"></span><span class="sp"></span>
+        <label class="fbtn">Load terrain file<input type="file" id="cFile" accept=".csv,.txt,text/csv" hidden></label>
+        <label id="cColL" hidden>Heights from <select id="cCol"></select></label>
+        <button class="fbtn" id="cReg">Regular game map</button></div>
+      <canvas id="cAll" aria-label="Whole data file: drag the bright stretch to choose the part you use"></canvas>
+      <div class="cbar">
+        <label>Length <input type="range" id="cLen" min="0" max="1000" step="1"> <b id="cLenV"></b></label>
+        <label>Scale down by <input type="range" id="cSD" min="0" max="1000" step="1"> <b id="cSDV"></b></label>
+        <label>Mountain height <input type="range" id="cH" min="0" max="1000" step="1"> <b id="cHV"></b></label></div>
+      <div class="cbar">
+        <button class="fbtn" id="cNat">Natural proportions</button>
+        <label><input type="checkbox" id="cSm"> Smooth curves</label>
+        <label>Bumps <input type="range" id="cRough" min="0" max="30" step="1"> <b id="cRoughV"></b></label>
+        <button class="fbtn" id="cShuf">New bumps</button></div>
+      <div class="cbar"><span id="cInfo"></span></div>
+      <canvas id="cOver" aria-label="Your course: click or drag to look along it"></canvas>
+      <div class="cbar"><span>Close-up height:</span><span id="cVH"><button data-vh="200">200 m</button> <button data-vh="500">500 m</button> <button data-vh="1000">1 km</button> <button data-vh="2000">2 km</button> <button data-vh="5000">5 km</button></span>
+        <button class="fbtn" id="cSug">Suggest shelters</button><span id="cSh"></span></div>
+      <div class="cwrap"><canvas id="cDetail" aria-label="Close look at the ground at game scale: click a flat spot to place a shelter, click a shelter to remove it"></canvas></div>
+      <div class="cfoot"><span>Arrow keys, the strip above, or dragging the picture move you along the course.</span><button id="cGo">Fly this course</button></div>
+    </div>
     <div class="panel overlay" id="overlay">
       <h2 id="ovTitle">Lunar Lander</h2>
-      <p id="ovGoal"></p>
       <p id="ovHover" hidden></p>
       <div class="keyline" id="ovKeys">
-        <b>←  →</b><span>rotate the ship</span>
-        <b>W</b><span>fire the engine (hold)</span>
-        <b>↑  ↓</b><span>throttle up, down (10% steps)</span>
-        <b>Space</b><span>start, pause</span>
-        <b>R</b><span>restart</span>
-        <b>V</b><span>velocity components on, off</span>
-        <b>A</b><span>acceleration components on, off</span>
-        <b>F</b><span>forces diagram; again for components</span>
+        <b><kbd>←</kbd><kbd>→</kbd></b><span>rotate the ship</span>
+        <b><kbd>W</kbd></b><span>fire the engine (hold)</span>
+        <b><kbd>↑</kbd><kbd>↓</kbd></b><span>throttle up, down</span>
+        <b><kbd>Space</kbd></b><span>start, pause</span>
+        <b><kbd>R</kbd></b><span>restart</span>
+        <b><kbd>F</kbd></b><span>forces diagram</span>
       </div>
+      <button id="bDetails" aria-expanded="false">Show detailed instructions</button>
+      <p id="ovGoal"></p>
+      <button class="primary" id="bMission">Start game</button>
       <div class="results" id="ovResults" hidden></div>
       <div class="graphs" id="ovGraphs" hidden>
         <canvas id="gP" width="720" height="420" aria-label="P/T graph"></canvas>
         <canvas id="gV" width="720" height="420" aria-label="V/T graph"></canvas>
       </div>
       <div id="menu" class="btnrow" style="display:grid;gap:10px;justify-items:center">
-        <div class="btnrow"><button class="primary" id="bMission">Start mission</button></div>
-        <div class="btnrow"><span class="lbl">Practice landing:</span>
+        
+        <div class="btnrow" hidden><span class="lbl">Practice landing:</span>
           <button data-practice="0">Plateau</button><button data-practice="1">Ravine</button><button data-practice="2">Mountain</button><button data-practice="3">Ledge</button><button data-practice="4">Crater</button>
         </div>
-        <div class="btnrow"><span class="lbl">Educational mode:</span><button id="bEdu" aria-pressed="false">Off</button>
-          <span class="lbl" style="margin-left:14px">Touch controls:</span><button id="bTouch" aria-pressed="false">Off</button></div>
-        <div class="btnrow"><span class="lbl">Velocity components (V):</span><button id="bComp" aria-pressed="false">Off</button>
+        <div class="btnrow" hidden><span class="lbl" hidden>Educational mode:</span><button id="bEdu" aria-pressed="false" hidden>Off</button></div>
+        <div class="btnrow" hidden><span class="lbl">Velocity components (V):</span><button id="bComp" aria-pressed="false">Off</button>
           <span class="lbl" style="margin-left:14px">Acceleration components (A):</span><button id="bAComp" aria-pressed="false">Off</button></div>
         <div class="btnrow" id="eduOpts" hidden>
           <span class="lbl">World:</span><button data-world="Moon" aria-pressed="true">Moon</button><button data-world="Mars" aria-pressed="false">Mars</button><button data-world="Ceres" aria-pressed="false">Ceres</button>
           <span class="lbl" style="margin-left:10px">Mass:</span><button id="bMass" aria-pressed="true">Changes as fuel burns</button>
         </div>
-        <div class="ver">Version 105</div>
+        <div class="menufoot"><div class="ver">Version 185</div><div class="btnrow"><span class="lbl">Touch controls:</span><button id="bTouch" aria-pressed="false">Off</button><button id="bDemo">Parabola demo</button><button id="bReal">Experimental: real Moon</button><button id="bBuild" hidden>Course builder</button></div></div>
       </div>
       <div class="btnrow" id="ovButtons" hidden>
         <button class="primary" id="bAgain">Try again</button><button id="bRestart" hidden>Restart mission</button><button id="bContinue" hidden>Continue</button><button id="bMenu">Main menu</button>
@@ -336,12 +420,12 @@ button.primary { border-width: 2.5px; }
     // square of the grain's speed and never drop below a fifth)
     injLarge: 30, faceplate: 5, injMed: 10, injSmall: 5, suitTear: 33,
     // landing zones: how many small and medium grains get thrown, compared with normal ground
-    zClose: 2, zPacked: 0.33, zLoose: 3, packR: [70, 60, 50, 45, 40],
+    zClose: 2, zPacked: 0.33, zLoose: 3, zLargePacked: 0.1, packR: [70, 60, 50, 45, 40],
     // the walk to the ship: a torn suit has 20-40 s of air; someone who collapses dies unless aboard within 10 s
-    airMin: 20, airMax: 40, downLimit: 10, carryV: 0.6,
+    airMin: 20, airMax: 40, carryV: 0.6, seriousV: 0.5, tetherV: 0.3,
     // radiation (solar storm): dose per second in each place; radiation sickness at sickAt; points lost per sick person
     aScale: 24,   // px per m/s/s for the a arrow in the far view (grows as the view zooms in)
-    radShelter: 0.01, radIn: 0.03, radOut: 0.4, sickAt: 30, radPts: 30
+    radShelter: 0.01, radIn: 0.03, radOut: 0.4, sickAt: 30, radPts: 30, verySickAt: 60, veryPts: 60
   };
   let CFG = JSON.parse(JSON.stringify(CFG_DEFAULT));
   try { const saved = JSON.parse(localStorage.getItem('llDevCfg') || 'null'); if (saved) Object.assign(CFG, saved); } catch (e) {}
@@ -367,8 +451,18 @@ button.primary { border-width: 2.5px; }
   // landing zoom levels (every landing): coming down, the far view cuts to 400 m tall below 300 m above the
   // ground and to 200 m tall below 100 m; then the closest view below 40 m as before. Out again above 320 m / 110 m.
   // The shelter zoom takes priority over these near a shelter.
-  const LVL_H = [FAR_H, 400, 200], LVL_IN = [0, 300, 100], LVL_OUT = [0, 320, 110];
-  const LAND_ALT = 40, LAND_OUT_ALT = 50, LAND_H = 115;   // closest (landing) view: one cut to a 115 m tall view when descending below 40 m
+  const LVL_H = [FAR_H, 400, 200], LVL_IN = [0, 250, 100], LVL_OUT = [0, 270, 110];
+  let zoff = 0; try { zoff = +localStorage.getItem('llZoff') || 0; } catch (e) {}   // experimental mode: Z zooms out / Shift+Z zooms in by 50 m, on every view
+  const LAND_H0 = 115;
+  // camera settings (experimental mode: the dev panel's Camera section changes them live; saved in this browser)
+  const IS_REAL = new URLSearchParams(location.search).has('real');
+  const CAM_DEFAULT = { landH: IS_REAL ? 200 : LAND_H0, farH: FAR_H, maxH: 500, baseOff: 50, inBelow: 38, outAbove: 40, surface: true, surfWin: 1000, surfPct: 30, groundFirst: true,
+    mode: 'smooth', zoomIn: 38, zoomOut: 90, cooldown: 3, band: 30, ease: 0.5, easeX: 0.8, look: 2, gndMargin: 60, anchor: 'ship', pct: 50, topOn: true, topPx: 100, botOn: true, botPx: 250, gndOn: true, gndPx: 20, climbOn: false, climbPx: 350, showRed: true, shelH: 250 };
+  const CAM = Object.assign({}, CAM_DEFAULT);
+  if (IS_REAL) { try { Object.assign(CAM, JSON.parse(localStorage.getItem('llCam3') || '{}')); } catch (e) {} }
+  const shelH = () => Math.min(CAM.maxH, Math.max(100, CAM.shelH + zoff));   // shelter view: 250 m tall by default
+  const landH = () => Math.min(CAM.maxH, Math.max(50, CAM.landH + zoff)), farH = () => Math.min(CAM.maxH, Math.max(100, CAM.farH + zoff, view.autoH || 0));   // never wider than CAM.maxH   // experimental mode starts at a 200 m tall view at the base
+  const LAND_ALT = 40, LAND_OUT_ALT = 50, LAND_H = LAND_H0;   // closest (landing) view: one cut to a 115 m tall view when descending below 40 m
   // shelter zoom: the close view starts when the ship is less than 200 m above the next shelter's ground
   // and within 400 m of it sideways; it ends above 220 m or beyond 420 m
   const SH_ALT = 200, SH_X = 400;
@@ -382,10 +476,87 @@ button.primary { border-width: 2.5px; }
   // ---------- pickups ----------
   const DEBRIS = 30;              // m: landing closer than this to a shelter hurts people inside
   const REACH = 150;
-  const PTS = { safe: 100, injured: 40, killed: -100, closeMax: 50 };
+  const PTS = { safe: 100, injured: 40, serious: 0, closeMax: 50 };   // per astronaut: unhurt, injured, seriously injured
   const TEAM = 3;                 // astronauts per team
 
   // ---------- map: 24 km, fixed; a mountain of varied height (170-480 m) between each pair of sites ----------
+  // ---------- experimental mode: a course built from real terrain data (see the course builder) ----------
+  // The course is kept in this browser: the terrain profile (distance, height in m), the course length it is
+  // squeezed or stretched to, a vertical scale, and where the shelters are (fractions of the length).
+  const NP1 = [[0,-1065],[2446,-952],[4892,-980],[7337,-971],[9783,-975],[12229,-970],[14675,-961],[17121,-868],[19566,-891],[22012,-975],[24458,-982],[26904,-887],[29349,-835],[31795,-773],[34241,-704],[36687,-664],[39133,-568],[41578,-540],[44024,-691],[46470,-700],[48916,-607],[51362,-688],[53807,-542],[56253,-738],[58699,-827],[61145,-698],[63591,-784],[66036,-620],[68482,-650],[70928,-1330],[73374,-1281],[75819,-672],[78265,-700],[80711,-620],[83157,-597],[85603,-432],[88048,-172],[90494,26],[92940,398],[95386,451],[97832,423],[100277,301],[102723,436],[105169,373],[107615,374],[110061,306],[112506,286],[114952,303],[117398,602],[119844,526],[122290,-41],[124735,-460],[127181,-550],[129627,-220],[132073,346],[134518,637],[136964,519],[139410,312],[141856,302],[144302,262],[146747,152],[149193,-256],[151639,-576],[154085,-782],[156531,-838],[158976,-1068],[161422,-1314],[163868,-1320],[166314,-1342],[168760,-1396],[171205,-1518],[173651,-1520],[176097,-1522],[178543,-1334],[180988,-1183],[183434,-1264],[185880,-1206],[188326,-1290],[190772,-1202],[193217,-1124],[195663,-736],[198109,22],[200555,162],[203001,-55],[205446,-356],[207892,-832],[210338,-1435],[212784,-1722],[215230,-1786],[217675,-1948],[220121,-1983],[222567,-2048],[225013,-2036],[227458,-2040],[229904,-2104],[232350,-2090],[234796,-2152],[237242,-2172],[239687,-2188],[242133,-2195]];
+  const CONTROL0 = [
+    [0,  270], [240,  200], [360,  200], [1541,  234], [1788,  502], [2162,  801], [2247,  830], [2353,  787], [2671,  590], [2953,  350], [3660,  420], [3810,  420], [4680,  470], [4996,  430], [5171,  534], [5436,  647], [5496,  660], [5571,  640], [5796,  488], [5996,  316], [6150,  300], [6600,  250], [6810,  130], [6990,  30], [7140,  30], [7590,  150], [7830,  280], [8198,  311], [8445,  602], [8820,  930], [8905,  958], [9011,  916], [9329,  728], [9612,  498], [10140,  620], [10620,  760], [10770,  760], [11280,  700], [11789,  539], [11999,  679], [12316,  831], [12388,  849], [12477,  821], [12747,  612], [12986,  374], [13500,  340], [14250,  290], [14700,  380], [14850,  380], [15256,  540], [15390,  660], [16050,  600], [16362,  551], [16530,  628], [16785,  711], [16843,  721], [16915,  706], [17131,  569], [17323,  417], [18000,  340], [18900,  280], [19320,  330], [19560,  220], [19740,  120], [19890,  120], [20370,  230], [20640,  330], [21300,  290], [22350,  230], [23250,  180], [24000,  230]
+  ];
+  // default experimental course: the regular game map (its ground profile, base and five landing sites)
+  const COURSE_DEFAULT = (() => { const L = CONTROL0[CONTROL0.length - 1][0], b = 300, W = L - b;
+    return { name: 'Regular game map', pts: CONTROL0.map(c => [c[0], c[1]]), lenKm: W / 1000, vScale: 1, baseF: b / L, endF: 1,
+      shelters: [[3660,3810],[6990,7140],[10620,10770],[14700,14850],[19740,19890]].map(q => ((q[0] + q[1]) / 2 - b) / W) }; })();
+  const LSKEY = new URLSearchParams(location.search).has('default') ? 'll_course_reg' : 'll_course';   // the menu's Experimental button opens the DEFAULT map (own saved edits); the Course builder button keeps your uploaded course
+  // ----- course terrain (used by the course builder's pictures and by the game) -----
+  // Heights between the data points are filled in with a smooth curve that never overshoots (monotone cubic), plus optional gentle
+  // bumps. The bumps are seeded, so a course always gets the same ground. The game then adds its own fine roughness, craters and rocks.
+  function normCourse(c) {
+    if (!c) return null;
+    if (!c.cols) { if (!c.pts || c.pts.length < 2) return null; c.cols = [{ n: 'Heights', pts: c.pts }]; c.col = 0; }
+    c.col = Math.min(c.col || 0, c.cols.length - 1); c.pts = c.cols[c.col].pts; if (!c.pts || c.pts.length < 2) return null;
+    if (c.baseF == null) c.baseF = 0; if (c.endF == null) c.endF = 1;
+    if (c.smooth == null) c.smooth = false; if (c.rough == null) c.rough = 0; if (c.seed == null) c.seed = 1;
+    if (!Array.isArray(c.shelters)) c.shelters = [];
+    return c;
+  }
+  function loadCourse() { try { const c = normCourse(JSON.parse(localStorage.getItem(LSKEY) || 'null')); if (c) return c; } catch {} return normCourse(JSON.parse(JSON.stringify(COURSE_DEFAULT))); }
+  function saveCourse(c) { try { const o = Object.assign({}, c); delete o.pts; localStorage.setItem(LSKEY, JSON.stringify(o)); } catch {} }
+  function heightFn(P, smooth) {
+    const n = P.length, x = P.map(q => q[0]), y = P.map(q => q[1]), d = [], m = new Array(n).fill(0);
+    for (let i = 0; i < n - 1; i++) d.push((y[i + 1] - y[i]) / ((x[i + 1] - x[i]) || 1));
+    if (n > 2) {
+      m[0] = d[0]; m[n - 1] = d[n - 2];
+      for (let i = 1; i < n - 1; i++) m[i] = d[i - 1] * d[i] <= 0 ? 0 : (d[i - 1] + d[i]) / 2;
+      for (let i = 0; i < n - 1; i++) {
+        if (d[i] === 0) { m[i] = 0; m[i + 1] = 0; continue; }
+        const a = m[i] / d[i], b = m[i + 1] / d[i], s = a * a + b * b;
+        if (s > 9) { const t = 3 / Math.sqrt(s); m[i] = t * a * d[i]; m[i + 1] = t * b * d[i]; }
+      }
+    }
+    let k = 0;
+    return u => {
+      if (u <= x[0]) return y[0];
+      if (u >= x[n - 1]) return y[n - 1];
+      if (!(x[k] <= u && u <= x[k + 1])) { let lo = 0, hi = n - 1; while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (x[mid] <= u) lo = mid; else hi = mid; } k = lo; }
+      const h = x[k + 1] - x[k] || 1, t = (u - x[k]) / h;
+      if (!smooth) return y[k] + (y[k + 1] - y[k]) * t;
+      const t2 = t * t, t3 = t2 * t;
+      return (2 * t3 - 3 * t2 + 1) * y[k] + (t3 - 2 * t2 + t) * h * m[k] + (-2 * t3 + 3 * t2) * y[k + 1] + (t3 - t2) * h * m[k + 1];
+    };
+  }
+  // seeded bumps: five octaves of smooth noise, 800 m down to 50 m across; each is 1.2% as high as it is wide (9.6 m ... 0.6 m), times the roughness
+  function bumpFn(seed, rough) {
+    const hash = (i, s) => { let h = (Math.imul(i | 0, 374761393) + Math.imul(s | 0, 668265263)) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296 * 2 - 1; };
+    const vn = (x, lam, s) => { const t = x / lam, i = Math.floor(t), f = t - i, u = f * f * (3 - 2 * f); return hash(i, s) * (1 - u) + hash(i + 1, s) * u; };
+    return x => { let y = 0; for (let j = 0; j < 5; j++) { const lam = 800 / (1 << j); y += 0.012 * lam * vn(x, lam, seed + j * 31); } return y * rough; };
+  }
+  // the ground profile of a course: [x, height] points; x = 0 is the start of the flat lead-in, the base is at x = 400
+  function courseProfile(C) {
+    const P = C.pts, d0 = P[0][0], L = P[P.length - 1][0] - d0, b = d0 + (C.baseF || 0) * L, e = d0 + (C.endF == null ? 1 : C.endF) * L;
+    const W = C.lenKm * 1000, k = W / (e - b), vs = C.vScale, rough = C.rough || 0, dense = !!C.smooth || rough > 0, hAt = heightFn(P, !!C.smooth);
+    const pts = [[0, hAt(b) * vs], [400, hAt(b) * vs]];
+    if (!dense) { for (const q of P) if (q[0] > b && q[0] < e) pts.push([400 + (q[0] - b) * k, q[1] * vs]); }
+    else {
+      const step = Math.max(10, Math.round(W / 20000)), bump = rough > 0 ? bumpFn(C.seed || 1, rough) : () => 0;
+      for (let x = step; x < W - step / 2; x += step) pts.push([400 + x, hAt(b + x / k) * vs + bump(x)]);
+    }
+    pts.push([400 + W, hAt(e) * vs]);
+    return pts;
+  }
+  const QS = new URLSearchParams(location.search);
+  const COURSE = QS.has('real') ? loadCourse() : null;
+  // The course runs from the base to the end point. Map x = 400 is the base (a flat lead-in sits behind it), and the
+  // map ends at the end point. lenKm is the distance from base to end; shelters are fractions of that distance.
+  const REAL = COURSE ? (() => {
+    const W = COURSE.lenKm * 1000, pts = courseProfile(COURSE);
+    const sh = [...COURSE.shelters].sort((a, b) => a - b).slice(0, 5).map(f => Math.min(400 + W - 200, Math.max(1500, 400 + f * W)));
+    return { pts, sites: [400, ...sh], dense: !!COURSE.smooth || (COURSE.rough || 0) > 0 };
+  })() : null;
   let MAP_W = 24000;   // shortened below when the stops are moved closer together
   const BASE = { x1: 240, x2: 360, y: 200, base: true };   // moved left so the first shelter starts off the minimap
   const SITES = [
@@ -396,9 +567,7 @@ button.primary { border-width: 2.5px; }
     { name: 'Crater',   x1: 19740, x2: 19890, y: 120, side: 'left'  }
   ];
 
-  const CONTROL = [
-    [0,  270], [240,  200], [360,  200], [1541,  234], [1788,  502], [2162,  801], [2247,  830], [2353,  787], [2671,  590], [2953,  350], [3660,  420], [3810,  420], [4680,  470], [4996,  430], [5171,  534], [5436,  647], [5496,  660], [5571,  640], [5796,  488], [5996,  316], [6150,  300], [6600,  250], [6810,  130], [6990,  30], [7140,  30], [7590,  150], [7830,  280], [8198,  311], [8445,  602], [8820,  930], [8905,  958], [9011,  916], [9329,  728], [9612,  498], [10140,  620], [10620,  760], [10770,  760], [11280,  700], [11789,  539], [11999,  679], [12316,  831], [12388,  849], [12477,  821], [12747,  612], [12986,  374], [13500,  340], [14250,  290], [14700,  380], [14850,  380], [15256,  540], [15390,  660], [16050,  600], [16362,  551], [16530,  628], [16785,  711], [16843,  721], [16915,  706], [17131,  569], [17323,  417], [18000,  340], [18900,  280], [19320,  330], [19560,  220], [19740,  120], [19890,  120], [20370,  230], [20640,  330], [21300,  290], [22350,  230], [23250,  180], [24000,  230]
-  ];
+  const CONTROL = CONTROL0.map(c => c.slice());
   // landing-site lengths (CFG.siteW): the end with the shelter stays put, the other end moves
   SITES.forEach((t, i) => {
     const w = CFG.siteW[i]; if (!w) return;
@@ -425,10 +594,30 @@ button.primary { border-width: 2.5px; }
     for (const f of flats) { f.x1 = Math.round(remap(f.x1) * 10) / 10; f.x2 = Math.round(remap(f.x2) * 10) / 10; }
     MAP_W = Math.round(MAP_W - shift);
   }
+  // ---------- experimental: real Moon ground (LRO LOLA elevation profile from NASA Moon Trek) ----------
+  // Opened with ?real=<id>. The real heights replace the made-up map at true scale; the base and the five
+  // landing sites are put on short flat pads cut into the real ground at fixed distances along the line.
+  if (REAL) {
+    SITES.length = REAL.sites.length - 1;
+    SITES.forEach((t, i) => { t.name = 'Shelter ' + (i + 1); });
+    const P = REAL.pts, lo = Math.min(...P.map(q => q[1])), off = 100 - lo;
+    const elev = x => { for (let i = 0; i < P.length - 1; i++) if (x <= P[i + 1][0]) return P[i][1] + (P[i + 1][1] - P[i][1]) * (x - P[i][0]) / (P[i + 1][0] - P[i][0]); return P[P.length - 1][1]; };
+    MAP_W = P[P.length - 1][0];
+    const flats = [BASE, ...SITES], at = REAL.sites;
+    flats.forEach((f, i) => {
+      const w = f.x2 - f.x1, c = at[i];
+      f.x1 = c - w / 2; f.x2 = c + w / 2; f.y = Math.round(elev(c) + off);
+    });
+    const ctl = P.map(q => [q[0], q[1] + off]).filter(q => !flats.some(f => q[0] > f.x1 - 60 && q[0] < f.x2 + 60));
+    for (const f of flats) ctl.push([f.x1, f.y], [f.x2, f.y]);
+    ctl.sort((a, b) => a[0] - b[0]);
+    CONTROL.length = 0; CONTROL.push(...ctl);
+    REAL.top = Math.max(...ctl.map(q => q[1]));
+  }
   for (const t of SITES) t.shelterX = t.side === 'left' ? t.x1 + 5 : t.x2 - 5;
   // the large mountains (for the "after rescuing everyone" achievement): the 480 m mountain between base and the
   // plateau, and the 460 m mountain between the ravine and the mountain site together with the mountain site's slopes
-  const BIG = [[CONTROL[3][0], CONTROL[9][0]], [CONTROL[27][0], CONTROL[38][0]]];
+  const BIG = REAL ? [] : [[CONTROL[3][0], CONTROL[9][0]], [CONTROL[27][0], CONTROL[38][0]]];
   const FLATS = [BASE, ...SITES];
   const isFlat = (a, b) => FLATS.some(f => f.x1 === a[0] && f.x2 === b[0]);
 
@@ -439,7 +628,7 @@ button.primary { border-width: 2.5px; }
     terrain.push(CONTROL[0]);
     for (let i = 0; i < CONTROL.length - 1; i++) {
       const a = CONTROL[i], b = CONTROL[i + 1];
-      if (isFlat(a, b)) { terrain.push(b); continue; }
+      if (isFlat(a, b) || (REAL && REAL.dense)) { terrain.push(b); continue; }   // a dense course (smoothed / bumped in the builder) is used as it is
       const len = b[0] - a[0], sl = (b[1] - a[1]) / len;
       let n = Math.max(1, Math.round(len / 40));
       if (Math.abs(sl) < 0.3) {
@@ -540,7 +729,7 @@ button.primary { border-width: 2.5px; }
   seed = 1825234981;
   for (const D of BG_DEPTHS) {
     D.m = [];
-    for (let x = -2500; x < 24000 * D.p + 4000; x += D.gap[0] + rnd() * (D.gap[1] - D.gap[0])) {
+    for (let x = -2500; x < Math.max(24000, MAP_W) * D.p + 4000; x += D.gap[0] + rnd() * (D.gap[1] - D.gap[0])) {
       // varied sizes: about one in five is a big one (up to twice the usual height), and the width-to-height
       // ratio varies from steep peaks to broad, low massifs
       // sizes vary widely: about one in five is big (1.6-2.4x), one in four small (0.4-0.7x), the rest in between
@@ -581,14 +770,26 @@ button.primary { border-width: 2.5px; }
   const stars = [];
   for (let i = 0; i < 450; i++) stars.push([rnd(), rnd(), rnd() < 0.15 ? 1.8 : 1.1]);
 
+  var flatGround = null;   // the parabola demo flies over gently bumpy ground at about this height
+  const demoBump = x => 0.6 * Math.sin(x / 19) + 0.35 * Math.sin(x / 7.3 + 1.3) + 0.15 * Math.sin(x / 3.1 + 2.1);   // up to about 1 m
   function groundAt(x) {
+    if (flatGround !== null) return flatGround + demoBump(x);
     if (x < 0) return terrain[0][1] + (-x) * 2.5;
     if (x > MAP_W) return terrain[terrain.length - 1][1] + (x - MAP_W) * 2.5;
     let lo = 0, hi = terrain.length - 1;
     while (hi - lo > 1) { const m = (lo + hi) >> 1; if (terrain[m][0] <= x) lo = m; else hi = m; }
     const [x0, y0] = terrain[lo], [x1, y1] = terrain[hi];
-    return x1 === x0 ? y0 : y0 + (y1 - y0) * (x - x0) / (x1 - x0);
+    const y = x1 === x0 ? y0 : y0 + (y1 - y0) * (x - x0) / (x1 - x0);
+    for (const f of SITES) if (x > f.x1 && x < f.x2) return y + siteBump(x, f);
+    return y;
   }
+  // the ground at a landing site is nearly flat: small bumps (up to about 0.6 m), none at the two ends
+  function siteBump(x, f) {
+    const u = x - f.x1, e = Math.max(0, Math.min(1, u / 4, (f.x2 - f.x1 - u) / 4));
+    return e * (0.4 * Math.sin(x / 11 + f.x1) + 0.2 * Math.sin(x / 4.3 + 1.7));
+  }
+  // where the ship rests when standing upright at x: on the higher of the two feet
+  const restY = x => Math.max(...SHIP.feet.map(p => groundAt(x + p[0]))) + 3.5;
   // Far view: the background mountains stand on the general ground level around the camera. For each 50 m:
   // the lower part (30th percentile) of the ground within 700 m either side, then smoothed over 800 m, so the
   // level changes only slowly as the ship flies and sits at or below most of the ground on screen.
@@ -636,6 +837,9 @@ button.primary { border-width: 2.5px; }
   const fbdOn = () => settings.edu || settings.fbd > 0;
   let game, s, view = { x: 0, y: 0, scale: 1, zoomed: false, level: 3 }, toastTimer = null;
   let grav = WORLDS.Moon;
+  // A copy of this file with "parabola" in its name is the parabola demo only: it opens straight into the demo,
+  // the game's keys are off, there is no Visualize button (the teacher presses X), and Menu becomes Restart.
+  const DEMO_ONLY = /parabola/i.test(decodeURIComponent(location.pathname));
 
   // fuel lasts longer on stronger-gravity worlds so a mission stays possible
   const worldFuel = () => Math.sqrt(Math.max(1, grav / WORLDS.Moon));
@@ -657,7 +861,7 @@ button.primary { border-width: 2.5px; }
     grav = WORLDS[settings.world];
     game = {
       mode, practiceIdx, state: 'landed', paused: false, time: 0, fuel: 100, main: false,
-      throttle: START_THROTTLE, score: 0, tally: { safe: 0, injured: 0, killed: 0 }, picked: new Set(),
+      throttle: START_THROTTLE, score: 0, tally: { safe: 0, injured: 0, serious: 0 }, picked: new Set(),
       log: [], logT: 0, wHeld: false, cp: null,
       hull: CFG.hull, hullMax: CFG.hull, dmgTotal: 0, upg: new Set(), legGone: 0,   // legGone: -1 left front leg broken, +1 right, 0 none
       faults: { handling: 0, fuel: 0, misfire: 0, life: 0, coolant: 0 }, lifeLeft: null,
@@ -695,23 +899,30 @@ button.primary { border-width: 2.5px; }
   }
 
   function showMenu() {
+    endDemo();
     setup('mission');
     game.state = 'intro';
     $('ovTitle').textContent = 'Lunar Lander';
     $('ovGoal').hidden = false; $('ovKeys').hidden = false; $('menu').hidden = false;
     $('ovResults').hidden = true; $('ovGraphs').hidden = true; $('ovButtons').hidden = true;
-    $('ovText').textContent = 'Click a button, or press Space to start the mission.';
+    $('ovText').textContent = ''; $('ovText').hidden = true;
+    $('ovGoal').hidden = true; $('bDetails').hidden = false; $('bDetails').textContent = 'Show detailed instructions'; $('bDetails').setAttribute('aria-expanded', 'false');
+    $('overlay').classList.add('intro');
     $('fbd').hidden = true;
     refreshGoal();
     $('overlay').hidden = false;
   }
   function refreshGoal() {
-    $('ovGoal').textContent = 'Pick up all five teams, then land back on the flat top of the base dome. Land on the flat ground beside each shelter. Touching down faster than 1.5 m/s down or 0.75 m/s sideways, or tilted more than 5°, damages the ship; faster than 6 m/s or tilted 10° or more breaks a leg; over 20° is a crash. Landing closer than 30 m to a shelter hurts the people inside.';
+    $('ovGoal').textContent = 'Pick up all five teams, then return to your base.\n\n' +
+      'Landing faster than 1.5 m/s vertically or 0.75 m/s horizontally, or touching down at an angle greater than 5° incurs damage.\n\n' +
+      'Land in the safe zone near the shelter. Landing closer greatly increases the chance of injury from flying rocks.\n\n' +
+      'Landing too far away from the shelter increases the astronauts\u2019 exposure to ionizing radiation and risks radiation sickness.';
     $('ovHover').hidden = !settings.edu || game.state !== 'intro';
     $('ovHover').textContent = `Before you fly: what throttle setting will make the ship hover? Hovering means thrust equals weight. The engine gives ${fmtN(CFG.thrust)} at 100%, the ship's mass is ${fmt(CFG.fullKg)} kg${settings.varMass ? ' with a full tank' : ''}, and gravity on ${settings.world === 'Moon' ? 'the Moon' : settings.world} is ${WORLDS[settings.world]} m/s/s.`;
   }
   function showEnd(title, text, opts = {}) {
-    $('ovTitle').textContent = title; $('ovText').textContent = text;
+    $('ovTitle').textContent = title; $('ovText').textContent = text; $('ovText').hidden = false;
+    $('bDetails').hidden = true; $('overlay').classList.remove('intro');
     $('ovGoal').hidden = true; $('ovHover').hidden = true; $('ovKeys').hidden = true; $('menu').hidden = true;
     $('ovResults').hidden = !opts.results;
     if (opts.results) {
@@ -815,7 +1026,7 @@ button.primary { border-width: 2.5px; }
   // ---------- achievements: remembered in this browser (placeholder names) ----------
   const ACH = {
     mountain: 'Crash into a mountain', landing: 'Crash while landing', team: 'Rescue a team', damage: 'Damage your vessel',
-    leg: 'Lose a leg', allTeams: 'Rescue all teams', complete: 'Complete the game', bigMountain: 'Die after rescuing everyone'
+    leg: 'Lose a leg', allTeams: 'Rescue all teams', complete: 'Complete the game'
   };
   let achGot = new Set();
   try { achGot = new Set(JSON.parse(localStorage.getItem('llAchievements') || '[]')); } catch (e) {}
@@ -850,10 +1061,10 @@ button.primary { border-width: 2.5px; }
     const x = s.x;
     const near = !!flat || FLATS.some(f => f.base ? x > DOME.x1 - 30 && x < DOME.x2 + 30 : x > f.x1 - 30 && x < f.x2 + 30);
     achieve(near ? 'landing' : 'mountain');
-    if (game.mode === 'mission' && game.picked.size === SITES.length && !flat && BIG.some(([a, b]) => x >= a && x <= b)) achieve('bigMountain');
   }
 
   function step(dt) {
+    if (game.mode === 'demo' && !(demo && demo.recording)) return;   // the parabola demo plays back a recording
     if (game.msg) return;   // a message box is waiting for Space
     if (game.state === 'emerging') { if (!game.paused && $('overlay').hidden) stepEmerge(dt); return; }
     if (game.paused || (game.state !== 'flying' && game.state !== 'landed')) return;
@@ -892,7 +1103,7 @@ button.primary { border-width: 2.5px; }
       if (game.overheat) thrust = 0;
     }
     const m = shipMass();
-    game.fuel = Math.max(0, game.fuel - fuelPerN() * thrust * dt * (F.misfire ? CFG.engDmgFuel / CFG.engDmgPower : 1) * (F.fuel ? CFG.poorFuel : 1) * (game.upg.has('economy') ? CFG.economy : 1));   // poor efficiency +15%, economy upgrade -20%
+    if (!REAL) game.fuel = Math.max(0, game.fuel - fuelPerN() * thrust * dt * (F.misfire ? CFG.engDmgFuel / CFG.engDmgPower : 1) * (F.fuel ? CFG.poorFuel : 1) * (game.upg.has('economy') ? CFG.economy : 1));   // poor efficiency +15%, economy upgrade -20%
 
     emitDebris(dt, thrust);
     stepBoarders(dt);
@@ -912,8 +1123,14 @@ button.primary { border-width: 2.5px; }
     if (game.deadT > 0) game.deadT -= dt;
     else if (F.handling && Math.random() < CFG.deadPerMin / 60 * dt) game.deadT = 0.4 + Math.random() * 0.3;
     const steer = !game.liftLock && !(game.deadT > 0);
-    if (steer && keys.has('ArrowLeft'))  s.rot = Math.max(-90, s.rot - rr * dt);
-    if (steer && keys.has('ArrowRight')) s.rot = Math.min(90,  s.rot + rr * dt);
+    if (REAL) {   // experimental mode: the ship can turn all the way round (kept between -180 and 180 degrees)
+      if (steer && keys.has('ArrowLeft'))  s.rot -= rr * dt;
+      if (steer && keys.has('ArrowRight')) s.rot += rr * dt;
+      if (s.rot > 180) s.rot -= 360; else if (s.rot < -180) s.rot += 360;
+    } else {
+      if (steer && keys.has('ArrowLeft'))  s.rot = Math.max(-90, s.rot - rr * dt);
+      if (steer && keys.has('ArrowRight')) s.rot = Math.min(90,  s.rot + rr * dt);
+    }
     s.thrusting = thrust > 0;
     const r = s.rot * Math.PI / 180, aT = thrust / m;
     s.ax = aT * Math.sin(r);
@@ -974,7 +1191,7 @@ button.primary { border-width: 2.5px; }
     const gy = groundAt(x0), dirE = -Math.sign(Math.sin(r)) || 1;   // the exhaust points this way
     const bias = Math.min(0.95, Math.abs(Math.sin(r)) * CFG.dAim);
     const zf = zoneFactor(x0), rest = Math.max(0, 100 - CFG.dFine - CFG.dLarge);
-    const share = [CFG.dFine, rest * 0.6 * zf, rest * 0.4 * zf, CFG.dLarge];
+    const share = [CFG.dFine, rest * 0.6 * zf, rest * 0.4 * zf, CFG.dLarge * (zf === CFG.zPacked ? CFG.zLargePacked : 1)];
     for (let sz = 0; sz < 4; sz++) {
       const n = CFG.dRate * share[sz] / 100 * str * dt;
       for (let i = 0; Math.random() < n - i; i++) {
@@ -1013,24 +1230,25 @@ button.primary { border-width: 2.5px; }
     const from = Math.abs(q.ox - site.shelterX);
     if (Math.random() > Math.min(1, Math.sqrt(DEBRIS / Math.max(1, from)))) return;
     const v = Math.hypot(q.vx, q.vy), e = Math.max(0.2, (v / 10) ** 2);
-    const C = crewOf(site), alive = C.people.filter(m => m.st < 2), unhurt = C.people.filter(m => m.st === 0);
+    // three levels: 0 unhurt, 1 injured, 2 seriously injured. Small and medium grains can injure someone unhurt;
+    // a large grain can injure anyone (worse each time) or crack a faceplate (seriously injured, suit torn)
+    const C = crewOf(site), notWorst = C.people.filter(m => m.st < 2), unhurt = C.people.filter(m => m.st === 0);
     const pick = a => a[Math.floor(Math.random() * a.length)];
-    const injure = m => {
-      m.st = 1; C.log.push(`${m.name} was hurt by flying rock.`);
-      if (Math.random() * 100 < CFG.suitTear) { m.suit = true; C.log.push(`${m.last}'s suit was torn.`); }
+    const tear = m => { if (!m.suit) { m.suit = true; C.log.push(`${m.last}'s suit was torn.`); } };
+    const hurt = m => {
+      m.st++;
+      C.log.push(m.st === 1 ? `${m.name} was injured by flying rock.` : `${m.name} was seriously injured by flying rock.`);
+      if (Math.random() * 100 < CFG.suitTear) tear(m);
     };
     if (q.sz === 3) {
-      if (!alive.length) return;
-      const m = pick(alive);
-      if (Math.random() * 100 < Math.min(90, CFG.faceplate * e)) { m.st = 2; C.log.push(`${m.name} was killed when a rock cracked the faceplate.`); return; }
-      if (Math.random() * 100 < Math.min(95, CFG.injLarge * e)) {
-        if (m.st === 1) { m.st = 2; C.log.push(`${m.name} was hit again and died.`); }
-        else injure(m);
-      }
+      if (!notWorst.length) return;
+      const m = pick(notWorst);
+      if (Math.random() * 100 < Math.min(90, CFG.faceplate * e)) { m.st = 2; C.log.push(`${m.name}'s faceplate was cracked by flying rock: seriously injured.`); tear(m); return; }
+      if (Math.random() * 100 < Math.min(95, CFG.injLarge * e)) hurt(m);
       return;
     }
     if (!unhurt.length) return;
-    if (Math.random() * 100 < Math.min(95, (q.sz === 2 ? CFG.injMed : CFG.injSmall) * e)) injure(pick(unhurt));
+    if (Math.random() * 100 < Math.min(95, (q.sz === 2 ? CFG.injMed : CFG.injSmall) * e)) hurt(pick(unhurt));
   }
   function drawGrains() {
     if (!grains.length) return;
@@ -1051,11 +1269,10 @@ button.primary { border-width: 2.5px; }
   function radiate(dt) {
     game.pilotDose += CFG.radIn * dt;
     for (const C of game.crews) for (const m of C.people) {
-      if (m.st >= 2) continue;
       m.dose += (m.where === 'ship' ? CFG.radIn : m.where === 'out' ? CFG.radOut : CFG.radShelter) * dt;
     }
   }
-  const doses = () => [game.pilotDose, ...game.crews.flatMap(C => C.people.filter(m => m.st < 2 && m.where === 'ship').map(m => m.dose))];
+  const doses = () => [game.pilotDose, ...game.crews.flatMap(C => C.people.filter(m => m.where === 'ship').map(m => m.dose))];
 
   // ---------- crew running from the shelter to the ship ----------
   // After a pickup the surviving astronauts come out of the shelter door one after another and lope to the
@@ -1063,14 +1280,14 @@ button.primary { border-width: 2.5px; }
   // until everyone is aboard, so landing closer to the shelter (but outside 30 m) gets them in sooner.
   // Survivors come out one after another and lope to the ladder (injured ones slower). A torn suit has 20-40 s
   // of air: if it runs out on the way the astronaut collapses, and the nearest unhurt colleague comes to carry
-  // them (slowly). Someone who has collapsed dies unless aboard within 10 s. Everyone outside takes the full dose.
+  // them (slowly): an unhurt teammate, else an injured one (slower), else an unhurt astronaut from an earlier team
+  // comes out of the ship, else Grace's emergency tether hauls them in. Nobody is lost. Everyone outside takes the full dose.
   function startBoarding(site) {
     const C = crewOf(site);
     game.boarders = [];
     let k = 0;
     for (const m of C.people) {
-      if (m.st >= 2) continue;
-      game.boarders.push({ m, C, x: site.shelterX, v: m.st ? CFG.limpV : CFG.runV, delay: k++ * 0.8, ph: Math.random() * 6, state: 'walk',
+      game.boarders.push({ m, C, x: site.shelterX, v: [CFG.runV, CFG.limpV, CFG.seriousV][m.st], delay: k++ * 0.8, ph: Math.random() * 6, state: 'walk',
         air: m.suit ? CFG.airMin + Math.random() * (CFG.airMax - CFG.airMin) : Infinity, tC: 0, done: false });
     }
     game.boardMsg = false;
@@ -1082,7 +1299,13 @@ button.primary { border-width: 2.5px; }
     b.x += st; b.ph += dt; return false;
   }
   function findCarrier(down) {
-    const ok = game.boarders.filter(b => b !== down && b.m.st === 0 && (b.state === 'walk' || b.state === 'aboard'));
+    const free = st => game.boarders.filter(b => b !== down && b.m.st === st && (b.state === 'walk' || b.state === 'aboard'));
+    let ok = free(0);
+    if (!ok.length) ok = free(1);
+    if (!ok.length) {   // an unhurt astronaut from an earlier team, already aboard, comes out
+      const helper = game.crews.flatMap(C => C.people).find(m => m.where === 'ship' && m.st === 0);
+      if (helper) { const h = { m: helper, C: down.C, x: s.x, v: CFG.runV, delay: 0, ph: 0, state: 'aboard', air: Infinity, tC: 0, done: true }; game.boarders.push(h); ok = [h]; }
+    }
     if (!ok.length) return null;
     ok.sort((p, q) => Math.abs(p.x - down.x) - Math.abs(q.x - down.x));
     const c = ok[0];
@@ -1103,27 +1326,23 @@ button.primary { border-width: 2.5px; }
           b.state = 'down'; b.tC = 0;
           b.C.log.push(`${b.m.last} ran out of air ${Math.round(Math.abs(ladder - b.x))} m from the ship and collapsed.`);
           const c = findCarrier(b);
-          if (!c) b.C.log.push(`No one was able to carry ${b.m.last}.`);
+          if (!c) { b.state = 'tether'; b.C.log.push(`Grace's emergency tether hauled ${b.m.last} in.`); }
           continue;
         }
         if (moveTo(b, ladder, b.v, dt)) { b.done = true; b.state = 'aboard'; b.m.where = 'ship'; }
+      } else if (b.state === 'tether') {
+        if (moveTo(b, ladder, CFG.tetherV, dt)) { b.done = true; b.state = 'aboard'; b.m.where = 'ship'; }
       } else if (b.state === 'fetch') {
         if (moveTo(b, b.target.x, CFG.runV, dt)) { b.state = 'carry'; b.v = CFG.carryV; b.target.state = 'carried'; }
       } else if (b.state === 'carry') {
         const t = b.target;
-        if (moveTo(b, ladder, CFG.carryV, dt)) {
+        const cv = b.m.st ? CFG.carryV * 0.6 : CFG.carryV;   // an injured carrier is slower
+        if (moveTo(b, ladder, cv, dt)) {
           b.done = true; b.state = 'aboard'; b.m.where = 'ship';
           t.done = true; t.state = 'aboard'; t.m.where = 'ship';
-          b.C.log.push(t.m.st < 2 ? `${b.m.last} carried ${t.m.last} aboard.` : `${b.m.last} carried ${t.m.last}'s body aboard.`);
+          b.C.log.push(`${b.m.last} carried ${t.m.last} aboard.`);
         }
         t.x = b.x;
-      }
-      if (b.state === 'down' || b.state === 'carried') {
-        b.tC += dt;
-        if (b.m.st < 2 && b.tC > CFG.downLimit) {
-          b.m.st = 2; b.C.log.push(`${b.m.last} died before reaching the ship.`);
-          if (b.state === 'down' && !b.carrier) { b.done = true; b.m.where = 'left'; }
-        }
       }
     }
     if (game.pickup && !boarding()) finishPickup();
@@ -1150,7 +1369,7 @@ button.primary { border-width: 2.5px; }
       const hd = L(0.62, 0.22); ctx.beginPath(); ctx.arc(hd[0], hd[1], 0.17 * k, 0, Math.PI * 2); ctx.fillStyle = '#000000'; ctx.fill(); ctx.stroke();
     };
     for (const b of game.boarders) {
-      if (b.state === 'down' && b.delay <= 0) { lying(b.x, groundAt(b.x)); continue; }
+      if ((b.state === 'down' || b.state === 'tether') && b.delay <= 0) { lying(b.x, groundAt(b.x)); continue; }
       if (b.done || b.delay > 0 || b.state === 'carried') continue;
       if (b.seed === undefined) b.seed = Math.random() * 2;
       if (b.state === 'carry') { const hs = hopState(b); lying(b.x, groundAt(b.x) + hs.y + 1.35); }
@@ -1211,6 +1430,15 @@ button.primary { border-width: 2.5px; }
   }
 
   function touchdown() {
+    if (game.mode === 'demo') {   // the parabola demo lands anywhere, no damage rules
+      s.vx = 0; s.rot = 0; s.vy = 0; s.ax = 0; s.ay = 0; s.y = groundAt(s.x) + 3.5; s.alt = 0; game.state = 'landed'; setMain(false); return;
+    }
+    if (REAL) {   // experimental mode: no crashes and no damage; the ship settles upright wherever it touches
+      setMain(false); s.thrusting = false; spawnDust(SHIP.feet.map(p => toWorld(p)), Math.hypot(s.vx, s.vy));
+      const fl = flatUnder(s.x - 4, s.x + 4);
+      s.rot = 0; s.vx = 0; s.vy = 0; s.ax = 0; s.ay = 0; s.alt = 0; s.y = fl && fl.base ? fl.y + 3.5 : restY(s.x);
+      if (!fl) { game.state = 'landed'; return; }
+    }
     const feet = SHIP.feet.map(p => toWorld(p));
     const fa = Math.min(feet[0][0], feet[1][0]), fb = Math.max(feet[0][0], feet[1][0]);
     const flat = flatUnder(fa, fb);
@@ -1230,13 +1458,13 @@ button.primary { border-width: 2.5px; }
     const down = Math.max(0, -s.vy), side = Math.abs(s.vx);
     const over = (v, lim) => v > lim ? Math.floor((v - lim) * 10 + 1e-9) : 0;
     const tiltDmg = tilt > CFG.tiltClean ? Math.floor(tilt - CFG.tiltClean + 1e-9) * CFG.tiltDmg : 0;
-    const dmg = (over(down, SAFE_Y()) + over(side, SAFE_X())) * CFG.dmgPerTenth + tiltDmg;
+    const dmg = REAL ? 0 : (over(down, SAFE_Y()) + over(side, SAFE_X())) * CFG.dmgPerTenth + tiltDmg;
     const tiltSnap = tilt >= CFG.tiltSnap;
-    const snap = down > CFG.snapV || side > CFG.snapV || tiltSnap;
+    const snap = !REAL && down > CFG.snapV || side > CFG.snapV || tiltSnap;
     // which leg breaks: the lower one when tilted, else the leading one, else either
     const legSide = tiltSnap || (Math.abs(s.rot) > 1 && side <= 0.5) ? Math.sign(s.rot) : side > 0.5 ? Math.sign(s.vx) : (Math.random() < 0.5 ? -1 : 1);
     const vxWas = s.vx;
-    s.y = flat.y + 3.5; s.rot = 0; s.vx = 0; s.vy = 0; s.ax = 0; s.ay = 0; s.alt = 0;
+    s.rot = 0; s.y = flat.base ? flat.y + 3.5 : restY(s.x); s.vx = 0; s.vy = 0; s.ax = 0; s.ay = 0; s.alt = 0;
     game.state = 'landed';
     let dmgText = '';
     if (dmg > 0 || snap) {
@@ -1261,7 +1489,7 @@ button.primary { border-width: 2.5px; }
       const d = footDist(fa, fb, t), P = crewOf(t).people, n = k2 => P.filter(m => m.st === k2).length;
       game.state = 'done';
       showEnd('Landed', tdv2.replace('\n', ' ') + ' Press Space to try again.', { results: [
-        ['Distance from shelter', Math.round(d) + ' m'], ['Safe', n(0)], ['Injured', n(1)], ['Killed', n(2)], ['Damage', dmg],
+        ['Distance from shelter', Math.round(d) + ' m'], ['Unhurt', n(0)], ['Injured', n(1)], ['Seriously injured', n(2)], ['Damage', dmg],
         ['Fuel used', Math.round(100 - game.fuel) + '%'], ['Time', fmtTime(game.time)]
       ] });
       return;
@@ -1284,20 +1512,20 @@ button.primary { border-width: 2.5px; }
   function finishPickup() {
     const P = game.pickup; game.pickup = null;
     const C = crewOf(P.site), n = k2 => C.people.filter(m => m.st === k2).length;
-    const safe = n(0), inj = n(1), killed = n(2), d = P.d;
+    const safe = n(0), inj = n(1), serious = n(2), d = P.d;
     const close = d >= DEBRIS ? Math.round(PTS.closeMax * (REACH - d) / (REACH - DEBRIS)) : 0;
-    const pts = safe * PTS.safe + inj * PTS.injured + killed * PTS.killed + Math.max(0, close);
+    const pts = safe * PTS.safe + inj * PTS.injured + serious * PTS.serious + Math.max(0, close);
     game.score += pts;
-    game.tally.safe += safe; game.tally.injured += inj; game.tally.killed += killed;
+    game.tally.safe += safe; game.tally.injured += inj; game.tally.serious += serious;
     // checkpoint: a crash or running out of fuel later restarts here, landed at this shelter
     game.cp = { site: P.site, x: s.x, score: game.score, tally: { ...game.tally }, picked: [...game.picked], fuel: game.fuel, time: game.time,
       hull: game.hull, hullMax: game.hullMax, dmgTotal: game.dmgTotal, upg: [...game.upg], repairLeft: game.repairLeft || 0, repairTotal: game.repairTotal || 0, legGone: game.legGone, faults: { ...game.faults }, lifeLeft: game.lifeLeft, fallen: !!game.legGone,
       crews: JSON.parse(JSON.stringify(game.crews)), pilotDose: game.pilotDose };
-    const sick = C.people.filter(m => m.st < 2 && m.dose >= CFG.sickAt).map(m => `${m.last} has radiation sickness.`);
+    const sick = C.people.filter(m => m.dose >= CFG.sickAt).map(m => m.dose >= CFG.verySickAt ? `${m.last} was hit by too many protons and is very sick.` : `${m.last} was hit by too many protons.`);
     showMsg([
       `Team picked up ${Math.round(d)} m from the shelter.`,
       ...C.log,
-      `${safe} unhurt, ${inj} injured, ${killed} killed.`,
+      `${safe} unhurt, ${inj} injured, ${serious} seriously injured.`,
       ...sick,
       `${pts >= 0 ? '+' : ''}${pts} points.`,
       P.upText,
@@ -1331,10 +1559,11 @@ button.primary { border-width: 2.5px; }
   }
   function missionComplete() {
     game.state = 'done'; hideToast(); achieve('complete');
-    const sick = doses().filter(v => v >= CFG.sickAt).length;   // the pilot and everyone aboard
-    game.score -= sick * CFG.radPts;
+    // radiation, the pilot and everyone aboard: sick, or very sick
+    const D = doses(), very = D.filter(v => v >= CFG.verySickAt).length, sick = D.filter(v => v >= CFG.sickAt && v < CFG.verySickAt).length;
+    game.score -= sick * CFG.radPts + very * CFG.veryPts;
     showEnd('Mission complete', 'Press Space to fly again.', { results: [
-      ['Safe', game.tally.safe], ['Injured', game.tally.injured], ['Killed', game.tally.killed], ['Radiation sickness', sick],
+      ['Unhurt', game.tally.safe], ['Injured', game.tally.injured], ['Seriously injured', game.tally.serious], ['Radiation sickness', sick], ['Very sick', very],
       ['Fuel left', Math.ceil(game.fuel) + '%'], ['Hull', game.hull + '/' + game.hullMax], ['Time', fmtTime(game.time)], ['Score', game.score]
     ] });
   }
@@ -1355,7 +1584,7 @@ button.primary { border-width: 2.5px; }
   // so the ship and the shelter both fit (never closer than 120 m top to bottom); elsewhere it is 120 m.
   // Ground at the top of the bottom third. Only if the ship reaches a screen edge does the view cut
   // (no scrolling) to a new fixed position.
-  function setScale() { view.scale = pxH / (view.close ? (view.closeH || CLOSE_H) : LVL_H[view.lvl || 0]); }
+  function setScale() { view.scale = pxH / (view.close ? (view.closeH || CLOSE_H) : (view.lvl ? LVL_H[view.lvl] : farH())); }
   const SHIP_DRAW = 1.25;   // the ship is drawn 25% larger than true size so it reads better (anchored at its feet)
   const shipScale = () => view.scale * SHIP_DRAW;
   const EDGE = 45, NAV = 340;   // px kept clear: screen edges; on the right the next-team display + the ship's labels
@@ -1365,13 +1594,13 @@ button.primary { border-width: 2.5px; }
     const tg = target(), st = tg.site;
     const nearSite = nearShelter(60);
     // shelter zoom: the shelter's ground goes 3/4 of the way down; closest view: the lower of it and the ground under the ship
-    const g = nearSite ? (view.landing ? Math.min(st.y, groundAt(s.x)) : st.y) : groundAt(s.x);
+    const g = nearSite ? Math.min(st.y, groundAt(s.x)) : groundAt(s.x);
     const shipTop = s.y - 3.5 + 11.9 * SHIP_DRAW;   // top of the cabin as drawn
     let need, gAt;   // view height, and where the ground goes (fraction of the height up from the bottom)
-    if (view.landing) { need = LAND_H; gAt = 1 / 3; }                                         // closest view: ground at the bottom third
+    if (view.landing) { need = landH(); gAt = 1 / 3; }                                         // closest view: ground at the bottom third
     else if (nearSite) { need = (shipTop - g) / (0.75 - 90 / pxH); gAt = 0.25; }             // shelter zoom: ground 3/4 of the way down
     else { need = CENTER_Y ? (s.y - g) * 2 / (1 - 120 / pxH) : (s.y + 3.5 - g) / (2 / 3 - 90 / pxH); gAt = 1 / 3; }
-    view.closeH = view.landing ? LAND_H : Math.min(FAR_H, Math.max(CLOSE_H, need));
+    view.closeH = (view.landing || REAL) ? landH() : Math.min(FAR_H, Math.max(CLOSE_H, need));
     view.fixedY = view.landing || nearSite;   // these two views hold still up and down (the ground stays put)
     setScale();
     const k = view.scale, hM = pxH / k, wM = pxW / k;
@@ -1403,14 +1632,23 @@ button.primary { border-width: 2.5px; }
   }
   // landing zoom levels: placed once with the ground under the ship 10% up from the bottom (room above the ship
   // for its a arrow), then held still; one cut if the ship or the ground under it leaves the screen
+  const SHIP_FROM_BOTTOM = 250, SHIP_MID = 4;   // after a zoom cut in the far and landing-level views the ship's centre is 250 px from the bottom of the screen
   function placeLvlY() {
     const hM = pxH / view.scale, k = view.scale;
-    view.y = groundAt(s.x) - hM * 0.1;
-    view.y = Math.max(view.y, s.y + SHIP_TOP + 140 / k - hM);
+    view.y = levelY(s.y);
+  }
+  // the ship's centre sits 250 px above the bottom edge, BUT the ground under the ship always comes first: it is kept at
+  // least GROUND_MARGIN px above the bottom edge (clear of the minimap), as long as the ship's top still fits on screen
+  const GROUND_MARGIN = 140;
+  function levelY(sy) {
+    const k = view.scale, hM = pxH / k;
+    let y = sy + SHIP_MID - SHIP_FROM_BOTTOM / k;
+    y = Math.min(y, groundAt(s.x) - GROUND_MARGIN / k);
+    return Math.max(y, sy + SHIP_TOP + 60 / k - hM);
   }
   function lvlYNeedsCut() {
     const top = SY(s.y + SHIP_TOP), g = SY(groundAt(s.x));
-    return top < 40 || SY(s.y - 3.5) > pxH - 20 || g > pxH || g < pxH * 0.3;
+    return top < 40 || SY(s.y - 3.5) > pxH - 20 || g > pxH - GROUND_MARGIN + 20;
   }
   function farYNeedsCut() {
     const top = SY(s.y + SHIP_TOP), bot = SY(s.y - 3.5), g = SY(groundAt(s.x));
@@ -1420,34 +1658,175 @@ button.primary { border-width: 2.5px; }
   // TRIAL: the ship is kept vertically centred on the screen at all times (the camera follows it up and
   // down). Set CENTER_Y = false to go back to the fixed-height camera with cuts.
   const CENTER_Y = true;
+  // SMOOTH CAMERA (game-style): two zoom levels with wide hysteresis and a cooldown (each change is one instant cut,
+  // so they are rare); up and down a DEAD ZONE (the camera only moves once the ship leaves the middle band of the
+  // screen) with an easy catch-up; sideways it eases toward a point a little AHEAD of the ship.
+  function smoothCam() {
+    const now = performance.now(), dt = Math.min(0.1, view.scT ? (now - view.scT) / 1000 : 0); view.scT = now;
+    const C = CAM, SHIFT = REAL ? 125 : 0, sy = emergeNow() ? BASE.y + 3.5 : s.y, g = groundAt(s.x);
+    const flying = game.state === 'flying' || game.state === 'ready';
+    const hA = Math.min(sy - 3.5 - (C.surface ? surfaceNow() : BASE.y), Math.max(0, s.alt));   // the lower of: height above the local surface, height above the ground right under the ship
+    // zoom level
+    if (view.scLand == null) view.scLand = true;
+    if (flying && game.mode !== 'demo') {
+      const since = (now - (view.scCut || 0)) / 1000;
+      const zOut = Math.min(C.zoomOut, 0.4 * landH()), zIn = Math.min(C.zoomIn, 0.25 * landH());   // limits scale with the landing view so the ground always fits in it
+      const want = view.scLand ? !(hA > zOut) : (hA < zIn && s.vy <= 0.5);
+      if (want !== view.scLand && (since > C.cooldown || (want && hA < zIn * 0.5))) { view.scLand = want; view.scSnap = true; view.scCut = now; }
+    }
+    if (game.state === 'landed' || emergeNow()) { if (!view.scLand) view.scSnap = true; view.scLand = true; }
+    // SHELTER view (250 m): between the travel view and the landing view, while the ship is in the shelter zone (within 400 m sideways
+    // and under 200 m above the next shelter's ground; leaves 60 m beyond that). It also has to FIT: the ground under the ship must still
+    // be on screen, so it is only used while the ship is low enough for that (with a wider margin to leave than to enter).
+    if (flying && game.mode !== 'demo' && game.state === 'flying' && !game.launching) {
+      const kS = pxH / shelH(), fitPx = s.alt * kS;
+      const inZone = nearShelter(view.scShel ? 60 : 0), fits = fitPx <= pxH - (view.scShel ? 130 : 190);
+      view.scShel = inZone && fits;
+    } else view.scShel = false;
+    const H = view.scLand ? landH() : view.scShel ? shelH() : Math.min(C.maxH, Math.max(100, C.farH + zoff));
+    view.close = view.landing = view.scLand; view.lvl = 0; view.closeH = H;
+    const k = pxH / H, wM = pxW / k;
+    if (Math.abs(view.scale - k) > 1e-9) view.scSnap = true;
+    view.scale = k;
+    // up and down: dead zone. Screen height of the ship measured up from the bottom, in px
+    const at = (w, px) => w - (px + SHIFT) / k;      // camera y putting world height w at px from the bottom
+    const lo = pxH * (0.5 - C.band / 200), hi = pxH * (0.5 + C.band / 200);
+    let ty = view.scTY == null || view.scSnap ? at(sy + SHIP_MID, pxH / 2) : view.scTY;
+    const shipPx = (sy + SHIP_MID - ty) * k - SHIFT;
+    if (shipPx < lo) ty = at(sy + SHIP_MID, lo); else if (shipPx > hi) ty = at(sy + SHIP_MID, hi);
+    // the ground under the ship stays above the bottom margin, as long as the ship still fits under the top band
+    // When the ground no longer fits, the ship is held 90 px below the top and the ground slides off the bottom gradually.
+    // (Before v179 the camera jumped back to the dead-zone position at that point, which made the view swoop up and down.)
+    const tg = g - (C.gndMargin + SHIFT) / k, tTop = at(sy + SHIP_MID, pxH - 90);
+    if (tg < ty) ty = Math.max(tg, tTop);
+    view.scTY = ty;
+    // sideways: aim a little ahead of the ship
+    const ahead = Math.max(-0.25 * wM, Math.min(0.25 * wM, s.vx * C.look));
+    const tx = s.x + ahead - wM / 2;
+    if (view.scSnap || view.scX == null) { view.scX = tx; view.scY = ty; view.gRef = g; view.scSnap = false; }
+    else {
+      const ay = 1 - Math.exp(-dt / Math.max(0.05, C.ease)), ax = 1 - Math.exp(-dt / Math.max(0.05, C.easeX));
+      view.scX += (tx - view.scX) * ax; view.scY += (ty - view.scY) * ay;
+      // hard limits: the ship never leaves the screen sideways or vertically, whatever the easing is doing
+      view.scX = Math.max(s.x - wM + 120 / k, Math.min(s.x - 120 / k, view.scX));
+      view.scY = Math.max(view.scY, at(sy + SHIP_TOP, pxH - 40));   // ship top at least 40 px below the top of the screen
+      view.scY = Math.min(view.scY, at(sy - 3.5, 30));              // ship feet at least 30 px above the bottom
+    }
+    view.x = view.scX; view.y = view.scY;
+  }
   function updateView() {
+    if (game.mode === 'demo' && demo) {
+      view.close = false;
+      // the x and y replay zooms in (over 1 s) to a view that fits just the coast
+      const z = demo.phase === 'xy' ? demo.zoom : 0, e = z * z * (3 - 2 * z), Z = demo.xyView;
+      const sc = demo.k * Math.pow(Z.k / demo.k, e);
+      const cx = demo.vx + pxW / demo.k / 2 + (Z.vx + pxW / Z.k / 2 - demo.vx - pxW / demo.k / 2) * e;
+      const cy = demo.vy + pxH / demo.k / 2 + (Z.vy + pxH / Z.k / 2 - demo.vy - pxH / demo.k / 2) * e;
+      view.scale = sc; view.x = cx - pxW / sc / 2; view.y = cy - pxH / sc / 2; return;
+    }
+    if (CAM.mode === 'smooth') { smoothCam(); return; }
     updateViewXY();
     // the closest view and the shelter zoom are the exceptions: they stay where they were placed
-    if (CENTER_Y && game.state !== 'over' && !(view.close && view.fixedY) && !(!view.close && view.lvl)) view.y = (emergeNow() ? BASE.y + 3.5 : s.y) - (pxH / view.scale) / 2;   // leaving the base: held where the ship will stop
+    if (game.state !== 'over') view.y = camY();   // fixed reference level (see camY)
+  }
+  // zoom is set by the ship's height above the AVERAGE ground across the screen (not the ground right under it),
+  // so flying over a peak or crater does not cut the zoom. Safety: within ZOOM_FLOOR m of the ground under the ship it is always the close view.
+  const ZOOM_FLOOR = 15;
+  // REFERENCE elevation: average ground over the whole map, leaving out mountains more than twice that average height
+  // (heights measured from the lowest point of the map). It sits at a FIXED place on screen: REF_PX above the bottom.
+  const REF_PX = 140, TOP_PX = 100;
+  let REF_Y = null;
+  function refY() {
+    if (REF_Y !== null) return REF_Y;
+    const n = 2000, h = []; for (let i = 0; i <= n; i++) h.push(groundAt(MAP_W * i / n));
+    const lo = Math.min(...h), avg = a => a.reduce((t, v) => t + v, 0) / a.length;
+    const m = avg(h) - lo, keep = h.filter(v => v - lo <= 2 * m);
+    return (REF_Y = avg(keep.length ? keep : h));
+  }
+  // camera height: never follows the ship, except when the ship climbs above TOP_PX px from the top (then the camera rises with it)
+  // and, as a safety, in a crater deep enough that the ground under the ship would drop below the screen
+  // SURFACE level: the ground around the ship with mountains and large hills left out (a low percentile of the ground within
+  // surfWin m either side), smoothed over time so it never jumps. It replaces the fixed baseline when CAM.surface is on.
+  function surfaceNow() {
+    const n = 40, h = []; for (let i = 0; i <= n; i++) h.push(groundAt(Math.max(0, Math.min(MAP_W, s.x + CAM.surfWin * (2 * i / n - 1)))));
+    h.sort((a, b) => a - b); const v = h[Math.min(n, Math.floor(n * CAM.surfPct / 100))];
+    view.surf = view.surf == null ? v : view.surf + (v - view.surf) * 0.08;
+    return view.surf;
+  }
+  const baseY = () => ((CAM.surface && view.surf != null) ? view.surf : DOME.y) - CAM.baseOff / view.scale;   // the baseline sits baseOff px below the surface
+  function camY() {
+    // vertical camera, set by the CAM settings. Screen positions are measured up from the bottom of the screen; in experimental
+    // mode the picture is drawn 125 px lower than that.
+    const k = view.scale, SHIFT = REAL ? 125 : 0, sy = emergeNow() ? BASE.y + 3.5 : s.y, g = groundAt(s.x), C = CAM;
+    const at = (w, pct) => w - (pxH * pct / 100 + SHIFT) / k;                     // camera y that puts world height w at pct % from the bottom
+    const anchorY = () => C.anchor === 'ground' ? g : C.anchor === 'baseline' ? baseY() : sy + SHIP_MID;
+    let y;
+    if (C.mode === 'follow') y = at(sy + SHIP_MID, C.pct);                         // ship always at pct %
+    else if (C.mode === 'baseline') y = at(baseY(), C.pct);                          // baseline always at pct %
+    else {                                                                        // hold still, cut when a trigger fires
+      const key = k.toFixed(5) + '|' + view.close;
+      const scr = w => pxH - (w - (view.camY == null ? 0 : view.camY)) * k + SHIFT;   // screen y (from the top) of world height w
+      let cut = view.camY == null || key !== view.camKey;
+      if (!cut && C.topOn && scr(sy + SHIP_TOP) < C.topPx) cut = true;
+      if (!cut && C.botOn && scr(sy - 3.5) > pxH - C.botPx) cut = true;
+      if (!cut && C.gndOn && scr(g) > pxH - C.gndPx) cut = true;
+      if (!cut && C.climbOn && (sy - (view.camShip || sy)) * k >= C.climbPx) cut = true;
+      if (cut) { view.camKey = key; view.camShip = sy; view.camY = at(anchorY(), C.pct); }
+      y = view.camY;
+    }
+    if (C.groundFirst) {   // pins the ground to the bottom edge, but never at the cost of pushing the ship off the top
+      const yg = Math.min(y, g - (30 + SHIFT) / k);
+      if (pxH - (sy + SHIP_TOP - yg) * k + SHIFT >= 30) y = yg;
+    }
+    return y;
+  }
+
+
+  function avgGround() {
+    const wM = pxW / view.scale, n = 24; let t = 0;
+    for (let i = 0; i < n; i++) t += groundAt(view.x + wM * (i + 0.5) / n);
+    return t / n;
   }
   function updateViewXY() {
     if (game.state === 'flying' || game.state === 'ready') {
-      const want = view.close ? (s.alt <= ZOOM_OUT_ALT || nearShelter(20)) : (s.alt < ZOOM_IN_ALT || nearShelter());
+      const hA = s.y - 3.5 - (CAM.surface ? surfaceNow() : BASE.y);   // height of the ship's feet above the baseline (the base's ground height)   // height over the average ground (0 when right at the surface)
+      // the zoom also has to FIT: the ground under the ship must be on screen. Close view only while the real height is <= 75 m (85 m to stay), landing view <= 55 m (65 m to stay)
+      const fitAlt = (CAM.pct / 100 - 40 / pxH) * landH() - 6;   // highest the ship can be with the ground still on screen, ship centred
+      const want = view.close ? (hA <= CAM.outAbove && s.alt <= fitAlt + 10) : (hA < CAM.inBelow && s.alt <= fitAlt);   // same limits as the landing view, so it cuts straight between landing and 600 m   // all the way out as soon as the ship is 20 m above the baseline
       if (want !== view.close) { view.close = want; view.landing = false; view.resetY = true; view.place = true; }
       // landing zoom levels (used whenever the shelter zoom and the closest view are not)
       if (game.state === 'flying') {
         const lv = view.lvl || 0; let lw = lv;
-        if (s.alt > LVL_OUT[1]) lw = 0; else if (lv === 2 && s.alt > LVL_OUT[2]) lw = 1;
-        if (s.vy < 0) { if (s.alt < LVL_IN[2]) lw = 2; else if (s.alt < LVL_IN[1]) lw = Math.max(lw, 1); }
+        if (hA > LVL_OUT[1]) lw = 0; else if (lv === 2 && hA > LVL_OUT[2]) lw = 1;
+        if (s.vy < 0) { if (hA < LVL_IN[2]) lw = 2; else if (hA < LVL_IN[1]) lw = Math.max(lw, 1); }
+        if (s.alt > 130 && lw === 2) lw = 1;   // fit: the ground under the ship must stay on screen in each view
+        if (s.alt > 260 && lw >= 1) lw = 0;
+        lw = 0;   // the in-between zoom levels are no longer used
         if (lw !== lv) { view.lvl = lw; if (!view.close) view.resetY = true; }
       }
       // landing view: entered while descending below 20 m, left above 25 m (each change is one instant cut)
       if (view.close && game.state === 'flying') {
-        const land = view.landing ? s.alt <= LAND_OUT_ALT : (s.alt < LAND_ALT && s.vy < 0);
+        const land = true;   // the close view is always the landing view
         if (land !== view.landing) { view.landing = land; view.place = true; }
       }
+    }
+    // AUTO ZOOM-OUT (far view): the ship and the ground under it must both fit; the view grows in 50 m steps
+    // (and shrinks again, in 50 m steps, once there is room to spare)
+    if (!view.close && (game.state === 'flying' || game.state === 'ready')) {
+      const need = (s.y + SHIP_MID - groundAt(s.x)) / (Math.max(0.2, CAM.mode === 'follow' ? CAM.pct / 100 : 0.5) - 70 / pxH);   // widens with 70 px to spare, so the 30 px clamp below never has to move the camera   // ship centred: the ground under it must fit in the lower half
+      const base = Math.max(100, CAM.farH + zoff); let a = Math.max(base, view.autoH || 0);
+      if (need > a) { a = Math.ceil((need + 100) / 50) * 50; view.shrinkT = null; }   // widen with 100 m to spare so it does not have to widen again right away
+      // narrows again only after the room has been there for 2.5 s in a row (no flicker over ridges)
+      if (a - 50 >= base && need < a - 250) { const t = performance.now(); if (view.shrinkT == null) view.shrinkT = t; if (t - view.shrinkT > 2500) { a = Math.max(base, Math.ceil((need + 100) / 50) * 50); view.shrinkT = null; } }
+      else view.shrinkT = null;
+      a = Math.min(a, CAM.maxH); view.autoH = a > base ? a : 0;
     }
     if (view.close) {
       if (view.place) { placeClose(); view.place = false; return; }
       setScale();
       const px = SX(s.x), top = SY(s.y + SHIP_TOP), bot = SY(s.y - 3.5);
       // next screen (one instant cut) once the ship is two thirds of the way across in its direction of travel
-      if ((s.vx > 0 && px > pxW * 2 / 3) || (s.vx < 0 && px < pxW / 3) || px < EDGE || px > pxW - EDGE || top < 20 || bot > pxH - 10) placeClose();
+      if ((s.vx > 0 && px > pxW * 2 / 3) || (s.vx < 0 && px < pxW / 3) || px < EDGE || px > pxW - EDGE || top < 20 || bot > pxH - 10 || SY(groundAt(s.x)) > pxH - 20) placeClose();
       return;
     }
     setScale();
@@ -1479,10 +1858,35 @@ button.primary { border-width: 2.5px; }
     const k = shipScale(), [fx, fy] = toWorld([0, -3.5]);
     return [SX(fx) + (s.x - fx) * k, SY(fy) - (s.y - fy) * k];
   }
+  // The small ships in the visualization: an upright Grace drawn once into its own picture (white lines, black
+  // inside) plus a black silhouette of it, at m pixels per metre. Reused until the size changes.
+  let miniCache = null;
+  function miniShip(m) {
+    const d = window.devicePixelRatio || 1;
+    if (miniCache && miniCache.m === m && miniCache.d === d) return miniCache;
+    const pad = 2, x0 = -5.1, x1 = 5.1, y0 = -3.6, y1 = 8.5, w = (x1 - x0) * m + 2 * pad, h = (y1 - y0) * m + 2 * pad;
+    const mk = () => { const c = document.createElement('canvas'); c.width = Math.ceil(w * d); c.height = Math.ceil(h * d); return c; };
+    const ship = mk(), mask = mk(), g = ship.getContext('2d');
+    g.setTransform(d, 0, 0, d, 0, 0); g.lineJoin = 'round'; g.lineCap = 'round'; g.lineWidth = 1.3;
+    const P = ([x, y]) => [pad + (x - x0) * m, pad + (y1 - y) * m];
+    for (const [pts, closed, alpha] of GRACE) {
+      g.beginPath(); pts.map(P).forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y));
+      if (closed) { g.closePath(); g.globalAlpha = 1; g.fillStyle = '#000000'; g.fill(); }
+      g.globalAlpha = alpha; g.strokeStyle = '#FFFFFF'; g.stroke();
+    }
+    const mg = mask.getContext('2d'); mg.drawImage(ship, 0, 0); mg.globalCompositeOperation = 'source-in'; mg.fillStyle = '#000000'; mg.fillRect(0, 0, mask.width, mask.height);
+    // the ship picture itself: black areas made fully black-opaque behind its lines (the mask is drawn first anyway)
+    miniCache = { m, d, ship, mask, w: Math.ceil(w * d) / d, h: Math.ceil(h * d) / d, ox: pad + (0 - x0) * m, oy: pad + (y1 - 0) * m };
+    return miniCache;
+  }
+  let shipSolid = 0;
   function drawShip() {
     const k = shipScale(), [cx, cy] = shipScreen();
     const scr = pt => { const [x, y] = toWorld(pt); return [cx + (x - s.x) * k, cy - (y - s.y) * k]; };
     ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.lineWidth = 1;
+    const dim = 1;
+    if (shipSolid) ctx.lineWidth = shipSolid;   // the small ships (their black backing is drawn first)
+    if (dim < 1) { ctx.setLineDash([2, 3]); ctx.globalAlpha = dim; }
     if (s.thrusting) {          // flames from all three nozzles, under the hull
       const L = (4 + Math.random() * 2.5) * (0.3 + 1.1 * game.throttle);
       ctx.strokeStyle = '#FFFFFF'; ctx.beginPath();
@@ -1498,7 +1902,7 @@ button.primary { border-width: 2.5px; }
       const q = pts.map(scr);
       ctx.beginPath(); q.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
       if (closed) { ctx.closePath(); ctx.globalAlpha = 1; ctx.fillStyle = '#000000'; ctx.fill(); }
-      ctx.globalAlpha = alpha; ctx.strokeStyle = '#FFFFFF'; ctx.stroke();
+      ctx.globalAlpha = alpha * dim; ctx.strokeStyle = '#FFFFFF'; ctx.stroke();
     });
     if (game.legGone) {
       const g = game.legGone, stub = [[1.7, -1.4], [2.15, -1.62], [2.0, -1.78], [2.45, -1.95]].map(([x, y]) => scr([g * x, y]));
@@ -1508,7 +1912,7 @@ button.primary { border-width: 2.5px; }
   }
 
   function drawShelter(t) {
-    const k = Math.max(view.scale, 10 / 6), cx = SX(t.shelterX), gy = SY(t.y);
+    const k = Math.max(view.scale, 10 / 6), cx = SX(t.shelterX), gy = SY(groundAt(t.shelterX));
     const r = 3 * k, picked = game.picked.has(t);
     ctx.beginPath(); ctx.moveTo(cx - r, gy); ctx.arc(cx, gy, r, Math.PI, 0); ctx.closePath(); ctx.fillStyle = '#000000'; ctx.fill();
     stroke(() => {
@@ -1529,6 +1933,18 @@ button.primary { border-width: 2.5px; }
       ctx.setLineDash([]);
       stroke(() => { ctx.moveTo(ex, gy - 12); ctx.lineTo(ex, gy); }, 1);
       ctx.restore();
+    }
+    // the sweet spot: the packed ground (30 m out to CFG.packR), marked with short thin diagonal lines under the surface
+    if (!picked) {
+      const dir = t.side === 'left' ? 1 : -1, end = t.side === 'left' ? t.x2 : t.x1;
+      const far = Math.min(CFG.packR[SITES.indexOf(t)] || 50, Math.abs(end - t.shelterX));
+      const a = SX(t.shelterX + dir * DEBRIS), b = SX(t.shelterX + dir * far), lo = Math.min(a, b), span = Math.abs(b - a);
+      const n = Math.max(1, Math.floor(span / 9)), L = 7;
+      if (span > 4) {
+        ctx.save(); ctx.globalAlpha = 0.8;
+        stroke(() => { for (let i = 0; i < n; i++) { const x = lo + (i + 0.5) * span / n, y = SY(groundAt(view.x + x / view.scale)); ctx.moveTo(x + L / 2, y + 3); ctx.lineTo(x - L / 2, y + 3 + L); } }, 1);
+        ctx.restore();
+      }
     }
   }
 
@@ -1659,7 +2075,7 @@ button.primary { border-width: 2.5px; }
       const Y0 = Math.min(cy, pxH - 50 - Math.max(0, fy)), AY = cy;   // keep a long downward v arrow on screen
       if (near) {
         // landing near a shelter: only the x and y components, solid, each with its value beside it.
-        // A component over the landing limit flashes: a white box with the arrow and its value in black.
+        // A component over the landing limit flashes red (arrow and value) instead of blue.
         const on = performance.now() % 600 < 350;
         const down = fy >= 0;
         const Lx = mkLabel('v', 'x', ' = ' + sgn(s.vx) + ' m/s', F, VX + 6, Y0 + (down ? -F * 1.0 : F * 1.0), 'left');
@@ -1669,21 +2085,10 @@ button.primary { border-width: 2.5px; }
           { bad: Math.abs(s.vx) > SAFE_X(), x1: VX + fx, y1: Y0, L: Lx },
           { bad: s.vy < -SAFE_Y(), x1: VX, y1: Y0 + fy, L: Ly }
         ];
-        const box = list => {   // one box around the arrows and values given
-          const xs = list.flatMap(c => [VX, c.x1, c.L.x, c.L.x + c.L.w]), ys = list.flatMap(c => [Y0, c.y1, c.L.y, c.L.y + c.L.h]);
-          let x0 = Math.min(...xs) - 14, y0 = Math.min(...ys) - 12, y1 = Math.max(...ys) + 12;
-          // only one flashing: keep its box off the other (white) component, which runs along y = Y0 or down from it
-          if (list.length === 1 && list[0] === parts[0]) { if (down) y1 = Math.min(y1, Y0 + 5); else y0 = Math.max(y0, Y0 - 5); }
-          if (list.length === 1 && list[0] === parts[1]) { if (down) y0 = Math.max(y0, Y0 + 5); else y1 = Math.min(y1, Y0 - 5); }
-          ctx.fillStyle = '#FFFFFF'; ctx.fillRect(x0, y0, Math.max(...xs) + 14 - x0, y1 - y0);
-        };
-        const flashing = on ? parts.filter(c => c.bad) : [];
-        if (flashing.length) box(flashing);   // both too fast: one box around both
         for (const c of parts) {
-          const inv = flashing.includes(c);
-          if (inv) c.L.color = '#000000';
-          drawArrow(VX, Y0, c.x1, c.y1, { w: 2.5, head: 14, color: inv ? '#000000' : VCOL });
-          if (!inv) c.L.color = VCOL;
+          const red = c.bad && on, col = red ? '#FF3B30' : VCOL;
+          drawArrow(VX, Y0, c.x1, c.y1, { w: 2.5, head: 14, color: col });
+          c.L.color = col;
           labels.push(c.L);
         }
       } else {
@@ -1800,7 +2205,10 @@ button.primary { border-width: 2.5px; }
     const wM = pxW / view.scale, x0 = view.x - 20, x1 = view.x + wM + 20;
 
     ctx.fillStyle = '#FFFFFF';
-    for (const [fx, fy, r] of stars) ctx.fillRect(fx * pxW, fy * pxH, r, r);   // mountains and ground are drawn over them
+    if (demo && demo.phase === 'xy') ctx.globalAlpha = 0.35;   // dimmer stars during the visualization
+    for (const [fx, fy, r] of stars) ctx.fillRect(fx * pxW, fy * pxH, r, r);
+    ctx.globalAlpha = 1;   // mountains and ground are drawn over them
+    if (REAL) ctx.translate(0, 125);   // experimental mode: the picture (not the stars or the panels) sits 125 px lower
     // background mountains, farthest first
     const curve = pts => {   // smooth curve through the points (quadratic through midpoints)
       ctx.moveTo(pts[0][0], pts[0][1]);
@@ -1818,7 +2226,7 @@ button.primary { border-width: 2.5px; }
     const camY = view.y + pxH / view.scale / 2;   // height of the middle of the view
     // vertical parallax: when the viewpoint is higher than the ground level they stand on, the ground drops on
     // screen by the full height difference but each layer only by 25% / 50% of it, so climbing shows more of them
-    for (const D of BG_DEPTHS) {
+    for (const D of (flatGround !== null ? [] : BG_DEPTHS)) {   // no background mountains over the demo's flat ground
       // ...but the lift is capped (far layer 25 m, near 12 m) so climbing high doesn't uncover long slopes
       // below them and turn them into towers
       const horizon = SY(ref) - Math.min((1 - D.p) * (camY - ref), D.p < 0.4 ? 25 : 12) * kf;
@@ -1842,16 +2250,25 @@ button.primary { border-width: 2.5px; }
       // smooth curve through the ground points, except the flat landing sites which stay dead straight
       for (let i = i0; i <= i1; i++) {
         const [x, y] = terrain[i], n = terrain[i + 1];
+        if (n && y === n[1] && SITES.some(f => f.x1 === x && f.x2 === n[0])) {   // a landing site: nearly flat, small bumps
+          ctx.lineTo(SX(x), SY(y)); for (let u = x + 1; u < n[0]; u += 1) ctx.lineTo(SX(u), SY(groundAt(u))); continue;
+        }
         if (!n || i === i0 || (y === n[1] && nearFlat(x, 1)) || (terrain[i - 1] && terrain[i - 1][1] === y && nearFlat(x, 1))) { ctx.lineTo(SX(x), SY(y)); continue; }
         ctx.quadraticCurveTo(SX(x), SY(y), SX((x + n[0]) / 2), SY((y + n[1]) / 2));
       }
       if (xR > MAP_W) ctx.lineTo(SX(Math.max(xR, MAP_W + 2000)), SY(groundAt(Math.max(xR, MAP_W + 2000))));
     };
+    if (flatGround !== null) {   // the demo's flat ground: one straight line
+      const gx0 = view.x - 10 / view.scale, gx1 = view.x + (pxW + 10) / view.scale, gp = () => { for (let x = gx0; x <= gx1 + 0.5; x += 0.5) ctx.lineTo(SX(x), SY(groundAt(x))); };
+      ctx.beginPath(); ctx.moveTo(-10, pxH + 10); gp(); ctx.lineTo(pxW + 10, pxH + 10); ctx.closePath(); ctx.fillStyle = '#000000'; ctx.fill();
+      ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.5; ctx.lineJoin = 'round'; ctx.beginPath(); ctx.moveTo(SX(gx0), SY(groundAt(gx0))); gp(); ctx.stroke();
+    } else {
     ctx.beginPath(); ctx.moveTo(-10, pxH + 10); gPath(); ctx.lineTo(pxW + 10, pxH + 10); ctx.closePath();
     ctx.fillStyle = '#000000'; ctx.fill();
     ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.5; ctx.lineJoin = 'round'; ctx.beginPath();
     { const [x, y] = terrain[i0]; ctx.moveTo(SX(xL < 0 ? Math.min(xL, -2000) : x), SY(xL < 0 ? groundAt(Math.min(xL, -2000)) : y)); }
     gPath(); ctx.stroke();
+    }
     // rocks, only when big enough on screen to read as rocks
     if (view.scale > 1.2) {
       ctx.save(); ctx.globalAlpha = 0.85;
@@ -1862,24 +2279,24 @@ button.primary { border-width: 2.5px; }
       }
       ctx.restore();
     }
-    for (const t of SITES) {
+    for (const t of (flatGround !== null ? [] : SITES)) {
       if (SX(t.x2) < -60 || SX(t.x1) > pxW + 60) continue;
-      stroke(() => { ctx.moveTo(SX(t.x1), SY(t.y) + 2); ctx.lineTo(SX(t.x2), SY(t.y) + 2); }, 6);   // thick, top edge on the surface
       drawShelter(t);
     }
-    drawBase();
+    if (flatGround === null) drawBase();
     drawDust();
     drawGrains();
     drawBoarders();
     if ((settings.edu || game.upg.has('path')) && (game.state === 'flying' || game.state === 'ready')) drawCoastPath();
     const E = emergeNow();
-    const vecLabels = E ? [] : drawVectors();   // the arrows go behind the ship
+    const vecLabels = E || game.mode === 'demo' ? [] : drawVectors();   // the arrows go behind the ship
     if (E) {   // still inside the base: only the part that has come up through the hatch shows
       const gy = SY(DOME.top);
       ctx.save(); ctx.beginPath(); ctx.rect(-10, -10, pxW + 20, gy + 9); ctx.clip();
       drawShip(); ctx.restore();
-    } else drawShip();
+    } else if (!(demo && demo.phase === 'xy')) drawShip();   // the x and y replay shows a white dot instead of the ship
     drawLabels(vecLabels);               // their labels go on top
+    if (game.mode === 'demo') { drawDemo(); return; }
     drawTargetPointer();
 
     if (game.paused) {
@@ -1890,24 +2307,44 @@ button.primary { border-width: 2.5px; }
       ctx.fillStyle = '#FFFFFF'; ctx.font = '20px "Share Tech Mono", monospace'; ctx.textAlign = 'center';
       ctx.fillText('Press Space to start', pxW / 2, 80);
     }
+    if (REAL && CAM.showRed && game.mode !== 'demo') {   // experimental mode: baseline (red dotted) and camera readout
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const off = 125, by = SY(baseY()) + off;   // the picture is drawn 125 px lower in this mode
+      ctx.save(); ctx.strokeStyle = '#FF3B30'; ctx.lineWidth = 2; ctx.setLineDash([4, 8]);
+      ctx.beginPath(); ctx.moveTo(0, by); ctx.lineTo(pxW, by); ctx.stroke(); ctx.restore();
+      ctx.fillStyle = '#FF3B30'; ctx.textAlign = 'right'; ctx.textBaseline = 'alphabetic';
+      ctx.font = '64px "Share Tech Mono", monospace';   // 48 pt
+      const dpx = Math.round(SY(baseY()) - SY(s.y - 3.5));   // ship's feet above (+) or below (-) the baseline, in screen pixels
+      ctx.fillText((dpx > 0 ? '+' : '') + dpx + ' px', pxW - 40, 200);
+      ctx.font = '24px "Share Tech Mono", monospace';
+      ctx.fillText('zoom: ' + Math.round(pxH / view.scale) + ' m view', pxW - 40, 240);
+    }
   }
 
   // ---------- force diagram (educational mode) ----------
   // ---------- minimap (upgrade from the first team picked up) ----------
   // A strip at the bottom left showing the terrain ahead: 5 km wide, 1.5 km tall, the ship 15% in from
   // the side it is coming from, looking toward the next team. Tune with the numbers below.
-  const MINI = { span: 5850, height: 1500, base: -100, shipAt: 0.5 };   // ship in the middle   // shows heights from -100 m to 1,400 m
+  const MINI = { span: REAL ? 11700 : 5850, height: REAL ? Math.max(1500, REAL.top + 300) : 1500, base: REAL ? 0 : -100, shipAt: 0.5 };   // ship in the middle   // shows heights from -100 m to 1,400 m
   // TUNING: always on for now. When the upgrade system goes in, unlock it with the first pickup:
   const hasMinimap = () => game.mode === 'practice' || game.upg.has('minimap');
   function drawMinimap() {
+    if (game.mode === 'demo') return;
     const c = $('minimap'), on = hasMinimap() && game.state !== 'intro';
     c.hidden = !on; if (!on) return;
     const g = c.getContext('2d'), W = c.width, H = c.height;
     g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#000000'; g.fillRect(0, 0, W, H);
     const t = target(), dir = t.x >= s.x ? 1 : -1;
     const left = dir > 0 ? s.x - MINI.span * MINI.shipAt : s.x - MINI.span * (1 - MINI.shipAt);
-    const k = W / MINI.span, base = MINI.base;   // fixed: the minimap never moves up or down
-    const X = x => (x - left) * k, Y = y => H - (y - base) * (H / MINI.height);
+    let k = W / MINI.span, base = MINI.base, mh = MINI.height;   // fixed: the minimap never moves up or down
+    if (REAL) {   // real terrain: drawn true to scale (same metres per pixel across and up), 11.7 km across,
+      // and kept centred between the ship and the ground under it, so slopes look as steep as they do in the game
+      mh = MINI.span * H / W;
+      const g = groundAt(s.x), want = (g + s.y) / 2;
+      MINI.fit = MINI.fit || { m: want }; MINI.fit.m += (want - MINI.fit.m) * 0.08;
+      base = MINI.fit.m - mh / 2;
+    }
+    const X = x => (x - left) * k, Y = y => H - (y - base) * (H / mh);
     g.strokeStyle = '#FFFFFF'; g.lineWidth = 2; g.lineJoin = 'round'; g.beginPath();
     for (let px = 0; px <= W; px += 4) { const y = Y(groundAt(left + px / k)); px ? g.lineTo(px, y) : g.moveTo(px, y); }
     g.stroke();
@@ -1943,26 +2380,41 @@ button.primary { border-width: 2.5px; }
     // one fixed scale (N per pixel) so arrow lengths can be compared; dot at 60% height
     // one fixed scale (full thrust plus weight fills 80% of the box), the drawing centred in the square box
     const Wd = fbdC.width, Hd = fbdC.height, FO = 0;   // all forces, Fnet included, start at the dot
-    const k = 0.94 * Hd / (CFG.thrust + W);
+    const k = (Hd - 110) / (CFG.thrust + W);   // room above and below for the labels
     const xs = [0, Tx * k, FO, FO + Nx * k], ys = [0, -Ty * k, W * k, -Ny * k];
     const cx = Wd / 2 - (Math.min(...xs) + Math.max(...xs)) / 2, cy = Hd / 2 - (Math.min(...ys) + Math.max(...ys)) / 2;
     fctx.setTransform(1, 0, 0, 1, 0, 0); fctx.clearRect(0, 0, Wd, Hd);
     fctx.fillStyle = '#FFFFFF'; fctx.font = '34px "Share Tech Mono", monospace';
     fctx.beginPath(); fctx.arc(cx, cy, 8, 0, Math.PI * 2); fctx.fill();
-    const arr = (ox, fx, fy, label, dash) => {
+    const arr = (ox, fx, fy, label, dash, mid = false) => {
       const len = Math.hypot(fx, fy) * k; if (len < 3) return;
       const x1 = ox + fx * k, y1 = cy - fy * k, ang = Math.atan2(y1 - cy, x1 - ox), hd = Math.min(18, len * .4);
       fctx.save(); fctx.strokeStyle = FCOL; fctx.lineWidth = 5; fctx.lineCap = 'round'; fctx.lineJoin = 'round';   // force arrows blue
       fctx.setLineDash(dash); fctx.beginPath(); fctx.moveTo(ox, cy); fctx.lineTo(x1, y1); fctx.stroke();
       fctx.setLineDash([]);
       fctx.beginPath(); fctx.moveTo(x1 - hd * Math.cos(ang - .45), y1 - hd * Math.sin(ang - .45)); fctx.lineTo(x1, y1); fctx.lineTo(x1 - hd * Math.cos(ang + .45), y1 - hd * Math.sin(ang + .45)); fctx.stroke();
-      fctx.textAlign = 'left';
-      fctx.fillText(label, Math.min(Wd - 70, x1 + 12), Math.min(Hd - 6, Math.max(22, y1 + (fy > 0 ? 8 : 4))));
+      // the label: F with a subscript, and the force in kN; at the tip, or beside the middle (mid) on the left
+      const [nm, sb] = label, val = ' = ' + (Math.hypot(fx, fy) / 1000).toFixed(1) + ' kN';
+      fctx.textAlign = 'left'; fctx.textBaseline = 'middle';
+      const F1 = '30px "Share Tech Mono", monospace', F2 = '22px "Share Tech Mono", monospace';
+      fctx.font = F1; const w1 = fctx.measureText(nm).width, w3 = fctx.measureText(val).width;
+      fctx.font = F2; const w2 = fctx.measureText(sb).width; const wt = w1 + w2 + w3;
+      let lx = mid ? ox + fx * k / 2 - 24 - wt : x1 - wt / 2, ly = mid ? cy - fy * k / 2 : y1 + (fy > 0 ? -24 : 24);   // tip labels centred just past the arrowhead
+      lx = Math.max(4, Math.min(Wd - wt - 4, lx)); ly = Math.min(Hd - 20, Math.max(18, ly));
+      fctx.fillStyle = '#FFFFFF';
+      if (mid) {   // beside the middle: two lines, right-aligned against the arrow
+        fctx.font = F1; const wv = fctx.measureText(val.slice(3)).width, we = fctx.measureText(' =').width, rx = Math.max(w1 + w2 + we, wv) + 4;
+        const x0 = Math.max(4, ox + fx * k / 2 - 22 - rx), yy = ly - 18;
+        fctx.fillText(nm, x0, yy); fctx.font = F2; fctx.fillText(sb, x0 + w1, yy + 8); fctx.font = F1; fctx.fillText(' =', x0 + w1 + w2, yy);
+        fctx.fillText(val.slice(3), x0, yy + 36);
+      } else {
+        fctx.font = F1; fctx.fillText(nm, lx, ly); fctx.font = F2; fctx.fillText(sb, lx + w1, ly + 8); fctx.font = F1; fctx.fillText(val, lx + w1 + w2, ly);
+      }
       fctx.restore();
     };
-    arr(cx, 0, -W, 'W', []);
-    if (onGround) arr(cx, 0, W, 'N', []);
-    else { arr(cx, Tx, Ty, 'T', []); arr(cx + FO, Nx, Ny, 'Fnet', [12, 9]); }
+    arr(cx, 0, -W, ['F', 'weight'], []);
+    if (onGround) arr(cx, 0, W, ['F', 'normal'], []);
+    else { arr(cx, Tx, Ty, ['F', 'thrust'], []); arr(cx + FO, Nx, Ny, ['F', 'net'], [12, 9], true); }
     // second press of F: the x and y components of thrust and of the net force, thin and dotted
     if (settings.fbd === 2 && !onGround) {
       fctx.save(); fctx.lineWidth = 2.5; fctx.font = '26px "Share Tech Mono", monospace';
@@ -2048,8 +2500,9 @@ button.primary { border-width: 2.5px; }
     const ax = nr.left + nr.width / 2 - sr.left, ay = nr.top + nr.height / 2 - sr.top;
     drawNav(SX(t.x) - ax, -(SY(t.y) - ay));
     $('rF').textContent = Math.ceil(game.fuel) + '%';
-    $('rTime').textContent = fmtTime(game.time) + (game.state === 'landed' && boarding() ? '  ×' + CFG.boardFF : '');
+    $('rTime').textContent = fmtTime(game.time) + ((timeX !== 1 || (game.state === 'landed' && boarding())) ? '  ×' + (timeX * (game.state === 'landed' && boarding() ? CFG.boardFF : 1)) : '');
     $('timeBox').hidden = game.state === 'intro';
+    $('bKbd').hidden = !IS_IPAD || game.state === 'intro';   // iPad only: switch between keyboard and touch controls during play
     { const w = $('pwBox').offsetWidth + 'px'; if (w !== '0px' && $('timeBox').style.width !== w) $('timeBox').style.width = w; }   // same width as the engine box
     $('rHull').textContent = game.hull + '/' + game.hullMax;
     $('rMass').textContent = 'Mass ' + fmt(Math.round(shipMass() / 10) * 10) + ' kg';
@@ -2080,7 +2533,7 @@ button.primary { border-width: 2.5px; }
     $('rPow').classList.toggle('on', firing);
     $('fuelFill').style.width = Math.max(0, game.fuel) + '%';
     // big altitude readout, close view only: feet to the ground directly below
-    $('altBig').hidden = !view.close || game.state === 'intro' || game.state === 'ready';
+    $('altBig').hidden = game.state === 'intro' || game.state === 'ready';
     $('rH').textContent = Math.max(0, s.alt).toFixed(1) + ' m';
     flash += dt;
     const flying = game.state === 'flying';
@@ -2090,20 +2543,374 @@ button.primary { border-width: 2.5px; }
     if (danger) w.textContent = 'Altitude warning: too fast';
     else if (lowFuel) w.textContent = game.fuel <= 0 ? 'Out of fuel' : 'Low on fuel';
     w.classList.toggle('off', !(danger || lowFuel) || (flash % 0.5) > 0.3);
-    if (fbdOn() && game.state !== 'intro') drawFBD();
+    if (demo) drawDemoFBD(); else if (fbdOn() && game.state !== 'intro') drawFBD();
     drawMinimap(); placeAch();
+  }
+
+  // ---------- parabola demo ----------
+  // A scripted pilot flies Grace through the game's own physics: full mass, thrust, gravity, turning rate and the
+  // 5 m upright rule. It lifts off from the base pad at 50% throttle, turns right as soon as it may (still firing),
+  // fires for 4 s more at 30 degrees, then shuts the engine off. The whole flight is recorded once, then played
+  // back. While it coasts, 20 dots mark where it was at equal times. "Show x and y motion" replays the coast with
+  // the ship's x shown on an x axis below the ground and its y on a y axis at the left, each leaving its own dots.
+  // The hop: Grace sits on the ground beside the base and lifts off. At 5 m (when the game lets it turn) the
+  // pilot tips it over and fires at an angle until it is moving at VT; then the engine shuts off and it coasts
+  // a full parabola. Coming back down to the height where the engine shut off, it fires again to brake, rights
+  // itself and lands. The pilot only uses the game's controls (rotate, throttle in 10% steps, fire).
+  const DEMO = { x: 470, liftThr: 0.3, vt: [9.5, 20], dotDt: 0.75, clear: 0.5, thrustX: 4 };   // the demo ship has four times the game's thrust
+  const DH = 1 / 120;
+  let demo = null;
+  function pilot(vtx, vty, fire, maxTilt, gain = 1.5) {
+    const aMax = CFG.thrust / shipMass();
+    const ax = gain * (vtx - s.vx), ay = gain * (vty - s.vy) + grav;
+    let want = Math.atan2(ax, ay) * 180 / Math.PI;
+    want = Math.max(-maxTilt, Math.min(maxTilt, want));
+    keys.delete('ArrowLeft'); keys.delete('ArrowRight');
+    if (want > s.rot + 1) keys.add('ArrowRight'); else if (want < s.rot - 1) keys.add('ArrowLeft');
+    if (!fire) { setMain(false); return; }
+    setThrottle(Math.max(0.1, Math.min(1, Math.hypot(ax, ay) / aMax)));
+    setMain(Math.abs(want - s.rot) < 20);
+  }
+  function startDemo() {
+    endDemo();
+    const fly = vxT => {   // record one hop with the coast's sideways speed vxT
+    setup('mission'); game.mode = 'demo'; game.emerge = null; game.lifeLeft = null;
+    $('overlay').hidden = true; $('fbd').hidden = true;
+    s.x = DEMO.x; s.y = groundAt(s.x) + 3.5; s.vx = s.vy = s.ax = s.ay = 0; s.rot = 0; s.alt = 0;
+    game.state = 'landed';
+    flatGround = null; flatGround = groundAt(DEMO.x) - demoBump(DEMO.x);   // gently bumpy ground at the start spot's height
+    { let g = -Infinity; for (let dx = -4; dx <= 4; dx += 0.25) g = Math.max(g, groundAt(s.x + dx)); s.y = g + 3.5; }   // feet clear of the bumps
+    grav = WORLDS.Moon;   // the demo is always on the Moon, whatever world is chosen
+    // lift-off throttle: 30%, or more if the ship is heavier (dev settings), so it always rises gently
+    const liftThr = Math.max(DEMO.liftThr, Math.ceil(13 * shipMass() * grav / CFG.thrust) / 10);
+    demo = { recording: true };
+    const thrust0 = CFG.thrust; CFG.thrust = thrust0 * DEMO.thrustX;
+    setThrottle(1); setMain(true);   // lift-off at full thrust; it turns as soon as the game allows (5 m up)
+    const rec = []; let ph = 'lift', cut = -1, brake = -1, cutY = 0, after = 0, settle = false;
+    for (let n = 0; n < 120 * 90; n++) {
+      const alt = s.alt;
+      game.liftLock = false;   // the demo pilot may turn as soon as it is off the ground
+      if (ph === 'lift') {   // full thrust until clear of the ground, then engine off
+        setThrottle(1); setMain(true);
+        if (game.state === 'flying' && alt >= DEMO.clear) { setMain(false); ph = 'turn'; }
+      }
+      if (ph === 'turn' || ph === 'burn') {
+        // the tilt that, at full thrust, gives exactly the coast velocity: thrust x time = change in v + g x time
+        const aT = CFG.thrust / shipMass(), dvx = vxT - s.vx, dvy = DEMO.vt[1] - s.vy, q = aT * aT - grav * grav;
+        const t = (grav * dvy + Math.sqrt(grav * grav * dvy * dvy + q * (dvx * dvx + dvy * dvy))) / q;
+        const want = Math.atan2(dvx, dvy + grav * t) * 180 / Math.PI;
+        keys.delete('ArrowLeft'); keys.delete('ArrowRight');
+        if (want > s.rot + 0.5) keys.add('ArrowRight'); else if (want < s.rot - 0.5) keys.add('ArrowLeft');
+        if (ph === 'turn' && Math.abs(want - s.rot) < 1) ph = 'burn';   // one slight turn with the engine off, then a full burn
+        if (ph === 'burn') { setThrottle(1); setMain(true); }
+        if (ph === 'burn' && dvx <= 0.02) { setMain(false); keys.clear(); ph = 'coast'; cut = rec.length; cutY = s.y; }
+      } else if (ph === 'coast') {
+        if (s.vy < -4) pilot(0, -1, false, 60); else { keys.delete('ArrowLeft'); keys.delete('ArrowRight'); }   // on the way down, turns to brake; engine off
+        if (s.vy < 0 && s.y <= cutY) { ph = 'brake'; brake = rec.length; }
+      } else if (ph === 'brake') {
+        if (game.state === 'landed') { setMain(false); keys.clear(); after += DH; }
+        else if (!settle && alt > 1.6 && s.vy < -1) {
+          // a hard braking burn aimed to stop both motions together about 1.5 m up
+          const h = Math.max(0.3, alt - 1.5), tt = 2 * h / -s.vy;
+          const ay = s.vy * s.vy / (2 * h) + grav, aT = CFG.thrust / shipMass();
+          let ax = -s.vx / tt; if (Math.hypot(ax, ay) > aT) ax = Math.sign(ax) * Math.sqrt(Math.max(0, aT * aT - ay * ay));   // stopping the fall comes first
+          const want = Math.max(-70, Math.min(70, Math.atan2(ax, ay) * 180 / Math.PI));
+          keys.delete('ArrowLeft'); keys.delete('ArrowRight');
+          if (want > s.rot + 0.5) keys.add('ArrowRight'); else if (want < s.rot - 0.5) keys.add('ArrowLeft');
+          setThrottle(Math.min(1, Math.hypot(ax, ay) / aT + 0.05)); setMain(Math.abs(want - s.rot) < 15);
+        } else {   // stopped about 2.5 m up: engine off, turn upright and drop the last bit
+          settle = true; setMain(false); keys.delete('ArrowLeft'); keys.delete('ArrowRight');
+          if (s.rot < -0.5) keys.add('ArrowRight'); else if (s.rot > 0.5) keys.add('ArrowLeft');
+        }
+      }
+      step(DH);
+      rec.push({ x: s.x, y: s.y, rot: s.rot, vx: s.vx, vy: s.vy, ax: s.ax, ay: s.ay, th: s.thrusting, alt: s.alt, st: game.state, T: s.thrusting ? game.throttle * CFG.thrust : 0, m: shipMass() });
+      if (after > 1.5) break;
+    }
+    keys.clear(); setMain(false); CFG.thrust = thrust0;
+    return { rec, cut, brake };
+    };
+    // Lay the hop out on screen: lift-off 6% in from the left, landing 86% across, the top of the arc 17% down
+    // from the top, the ground 14% up from the bottom. The sideways speed is adjusted (a few test flights) so the
+    // arc's width and height match this screen's shape.
+    const SPOT = { x0: 0.058, x1: 0.856, top: 0.166, ground: 0.86 };
+    let vxT = DEMO.vt[0], F;
+    for (let tries = 0; tries < 4; tries++) {
+      F = fly(vxT);
+      const r0 = F.rec[0], rL = F.rec[F.rec.length - 1], hTop = Math.max(...F.rec.map(r => r.y)) - r0.y;
+      const want = hTop * ((SPOT.x1 - SPOT.x0) * pxW) / ((SPOT.ground - SPOT.top) * pxH);   // the width that matches
+      if (Math.abs(want - (rL.x - r0.x)) < 0.5) break;
+      vxT *= want / (rL.x - r0.x);
+    }
+    const { rec, cut, brake } = F;
+    grains.length = 0;   // no dust left over from the recording
+    const end = rec.length - 1, tc = (brake - cut) * DH;
+    // a fixed view that fits the hop: ground near the bottom with the x axis under it, the controls below that
+    const r0 = rec[0], k = (SPOT.x1 - SPOT.x0) * pxW / (rec[end].x - r0.x), g0 = r0.y;   // ship centres
+    demo = { rec, cut, brake, end, tc, k, vx: r0.x - SPOT.x0 * pxW / k, vy: g0 - (1 - SPOT.ground) * pxH / k, phase: 'ready', i: 0, playing: false, showV: true, showA: false };
+    {   // the x and y replay's view: the coast fills the screen (room at the right for the y axis and its label,
+        // at the top for the controls, at the bottom for the downward arrows at the end)
+      const C = rec.slice(cut, brake + 1), cx0 = Math.min(...C.map(r => r.x)), cx1 = Math.max(...C.map(r => r.x));
+      const cy0 = Math.min(...C.map(r => r.y)), cy1 = Math.max(...C.map(r => r.y));
+      const zk = Math.min((pxW - 70 - 280) / (cx1 - cx0), (pxH - 100 - 210) / (cy1 - cy0));   // 210 px below for the falling arrows
+      demo.xyView = { k: zk, vx: cx0 - 70 / zk, vy: cy0 - 210 / zk };
+      demo.zoom = 1; demo.xyView = { k: demo.k, vx: demo.vx, vy: demo.vy };   // no zoom: the visualization keeps the flight view
+    }
+    showDemoFrame(0);
+    document.querySelector('.app').classList.add('demo'); $('demoCtl').hidden = false; $('demoTime').hidden = false;
+    fbdC.width = 480; fbdC.height = 480; $('fbd').hidden = true;
+    demoButtons();
+  }
+  function endDemo() {
+    demo = null; flatGround = null; keys.clear && keys.clear();
+    document.querySelector('.app').classList.remove('demo'); $('demoCtl').hidden = true; $('demoTime').hidden = true;
+    fbdC.width = 500; fbdC.height = 500; $('fbd').hidden = true;
+  }
+  function showDemoFrame(i) {
+    const r = demo.rec[Math.max(0, Math.min(demo.end, Math.round(i)))];
+    Object.assign(s, { x: r.x, y: r.y, rot: r.rot, vx: r.vx, vy: r.vy, ax: r.ax, ay: r.ay, thrusting: r.th, alt: r.alt });
+    game.state = r.st === 'landed' ? 'landed' : 'flying'; game.main = r.th;
+    if (demo.phase === 'ready') {   // before Launch: sitting on the ground, engine off
+      Object.assign(s, { y: groundAt(r.x) + 3.5, vx: 0, vy: 0, ax: 0, ay: 0, thrusting: false, alt: 0 });
+      game.state = 'landed'; game.main = false;
+    }
+  }
+  function demoTick(dt) {
+    const D = demo;
+    if (D.phase === 'xy' && D.zoom < 1) { D.zoom = Math.min(1, D.zoom + dt); if (D.zoom < 1) { showDemoFrame(D.i); return; } }   // zoom in first, then play
+    if (D.playing) {
+      // 3 s after the engine shuts off, time runs twice as fast until the braking burn
+      D.fast = D.i >= D.cut + 3 / DH && D.i < D.brake;
+      D.i += dt / DH * (D.fast ? 2 : 1);
+      const stop = D.phase === 'xy' ? D.brake : D.end;   // the x and y replay covers the coast only
+      if (D.i >= stop) { D.i = stop; D.playing = false; if (D.phase === 'fly') D.phase = 'flown'; demoButtons(); }
+    }
+    showDemoFrame(D.i);
+    const tc = Math.max(0, Math.min(D.tc, (D.i - D.cut) * DH));
+    $('dTn').textContent = tc.toFixed(1);
+    $('dX2').hidden = !(D.playing && D.fast);
+    if (D.phase === 'xy') $('dScrub').value = Math.round(tc / D.tc * 1000);
+  }
+  // the time's digits are centred up and down on the control box
+  function placeDemoTime() {
+    const cs = getComputedStyle($('dT')), c = document.createElement('canvas').getContext('2d');
+    c.font = cs.fontSize + ' ' + cs.fontFamily;
+    const m = c.measureText('0123456789'), lh = parseFloat(cs.fontSize);   // line-height is 1
+    const baseline = (lh - (m.fontBoundingBoxAscent + m.fontBoundingBoxDescent)) / 2 + m.fontBoundingBoxAscent;
+    const box = $('demoCtl'), mid = box.offsetTop + box.offsetHeight / 2;   // centre of the digits on the centre of the box
+    $('demoTime').style.top = (mid - (baseline - m.actualBoundingBoxAscent / 2)) + 'px';
+  }
+  function demoButtons() {
+    const D = demo;
+    const noShow = D.phase === 'xy';   // the Visualize page has no Visualize button
+    $('dShow').hidden = noShow; $('dShow').style.display = noShow ? 'none' : '';
+    $('fbd').hidden = D.phase !== 'xy';   // the free body diagram is on the Visualize page only
+    $('demoTime').style.right = ($('demoCtl').offsetWidth + 14 + 24) + 'px';   // the time sits just left of the control box
+    placeDemoTime();
+    $('dGo').textContent = D.phase === 'ready' ? 'Launch' : D.playing ? 'Pause' : D.phase === 'xy' && D.i <= D.cut ? 'Start' : 'Play';
+    $('dGo').disabled = D.phase === 'fly' || D.phase === 'flown';
+    $('dShow').disabled = D.phase !== 'flown';
+    for (const id of ['dReplay', 'dBack', 'dFwd', 'dScrub']) $(id).disabled = D.phase !== 'xy';
+    // show the next step: Visualize flashes once the flight is done, Start flashes until the visualization begins
+    $('dShow').classList.toggle('flash', D.phase === 'flown');
+    $('dGo').classList.toggle('flash', D.phase === 'xy' && !D.started);
+  }
+  $('dGo').addEventListener('click', () => {
+    const D = demo; if (!D) return;
+    if (D.phase === 'ready') { D.phase = 'fly'; D.i = 0; D.playing = true; }
+    else if (D.phase === 'xy') { if (D.i >= D.brake) D.i = D.cut; D.playing = !D.playing; D.started = true; }
+    demoButtons();
+  });
+  $('dShow').addEventListener('click', () => { demo.phase = 'xy'; demo.i = demo.cut; demo.playing = false; demo.started = false; demoButtons(); });   // waits for Start
+  $('dReplay').addEventListener('click', () => { demo.i = demo.cut; demo.playing = true; demo.started = true; demoButtons(); });
+  $('dScrub').addEventListener('input', e => { demo.playing = false; demo.i = demo.cut + (+e.target.value / 1000) * demo.tc / DH; demoButtons(); });
+  const dStep = d => { const D = demo, dt = DEMO.dotDt, t = (D.i - D.cut) * DH; D.playing = false;
+    D.i = D.cut + Math.max(0, Math.min(D.tc, Math.round(t / dt) * dt + d * dt)) / DH; demoButtons(); };
+  $('dBack').addEventListener('click', () => dStep(-1));
+  $('dFwd').addEventListener('click', () => dStep(1));
+  $('dA').addEventListener('click', () => { demo.showA = !demo.showA; $('dA').setAttribute('aria-pressed', demo.showA); });
+  $('dExit').addEventListener('click', () => { if (DEMO_ONLY) { startDemo(); $('dScrub').value = 0; } else showMenu(); });
+  function demoArrow(x0, y0, dx, dy, col, label, side, start = 0, dotted = false, lw = 3.5) {
+    const len = Math.hypot(dx, dy);
+    ctx.save(); ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = lw; ctx.lineCap = 'round';
+    if (len > start + 6) {
+      const ux = dx / len, uy = dy / len, hd = Math.min(10, len * 0.35), x1 = x0 + dx, y1 = y0 + dy;
+      ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 5; ctx.shadowOffsetY = 1.5;
+      if (dotted) { ctx.setLineDash([1, 5]); ctx.lineWidth = 2.5; }
+      ctx.beginPath(); ctx.moveTo(x0 + ux * start, y0 + uy * start); ctx.lineTo(x1 - ux * hd * 0.7, y1 - uy * hd * 0.7); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * hd - uy * hd * 0.5, y1 - uy * hd + ux * hd * 0.5); ctx.lineTo(x1 - ux * hd + uy * hd * 0.5, y1 - uy * hd - ux * hd * 0.5); ctx.closePath(); ctx.fill();
+      ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+    }
+    if (label) {
+      // label: plain text, or [main, subscript, rest] for a subscripted name such as v with x below
+      const parts = Array.isArray(label) ? label : [label, '', ''], small = Array.isArray(label);
+      const F = small ? 16 : 18, FS = 12;
+      ctx.textBaseline = 'middle';
+      ctx.font = F + 'px "Share Tech Mono", monospace'; const w1 = ctx.measureText(parts[0]).width, w3 = ctx.measureText(parts[2]).width;
+      ctx.font = FS + 'px "Share Tech Mono", monospace'; const w2 = ctx.measureText(parts[1]).width;
+      const W = w1 + w2 + w3;
+      let lx, ly;
+      if (side === 'aboveMid') { lx = x0 + dx / 2 - W / 2; ly = y0 + dy / 2 - 20; ctx.textAlign = 'left'; }        // centred over the arrow
+      else if (side === 'leftMid') {   // left of the arrow's middle (kept off the row of the label over the vx arrow)
+        lx = x0 + dx / 2 - 14; ly = y0 + dy / 2; if (ly > y0 - 42 && ly < y0 + 6) ly = y0 + 6; ctx.textAlign = 'right';
+      }
+      else if (side === 'midLeft') {   // centred up and down beside the arrow, on its left (right if there is no room)
+        ly = y0 + dy / 2; lx = x0 + dx / 2 - 12; ctx.textAlign = 'right';
+        if (lx - W < 8) { lx = x0 + dx / 2 + 12; ctx.textAlign = 'left'; }
+      }
+      else if (side === 'beyond') {                                                                                 // just past the tip
+        // centred on the line of the arrow, its nearest edge 6 px past the arrowhead
+        const ux = len > 1 ? dx / len : 1, uy = len > 1 ? dy / len : 0;
+        const d = 6 + Math.min(Math.abs(ux) > 0.01 ? W / 2 / Math.abs(ux) : 1e9, Math.abs(uy) > 0.01 ? 9 / Math.abs(uy) : 1e9);
+        lx = x0 + dx + ux * d - W / 2; ly = y0 + dy + uy * d; ctx.textAlign = 'left';
+      }
+      else if (Math.abs(dx) >= Math.abs(dy) && len > 1) { lx = x0 + dx + Math.sign(dx) * 10; ly = y0 + dy + (side === 'below' ? 16 : -14); ctx.textAlign = dx >= 0 ? 'left' : 'right'; }
+      else { lx = x0 + dx + (side === 'left' ? -12 : 12); ly = y0 + dy + (len > 1 ? Math.sign(dy) * 8 : 0); ctx.textAlign = side === 'left' ? 'right' : 'left'; }
+      let x = ctx.textAlign === 'right' ? lx - W : lx;
+      x = Math.max(8, Math.min(pxW - W - 8, x)); ly = Math.max(16, Math.min(pxH - 14, ly));   // keep labels on screen
+      ctx.textAlign = 'left'; ctx.lineWidth = 4; ctx.strokeStyle = '#000000';
+      for (const [t, f, dy] of [[parts[0], F, 0], [parts[1], FS, 5], [parts[2], F, 0]]) {
+        if (!t) continue;
+        ctx.font = f + 'px "Share Tech Mono", monospace'; ctx.strokeText(t, x, ly + dy); ctx.fillText(t, x, ly + dy); x += ctx.measureText(t).width;
+      }
+    }
+    ctx.restore();
+  }
+  // a label with a subscript (parts: main text, subscript, rest), anchored at x by its left edge or centre
+  function subLabel(parts, x, y, col, align) {
+    const F = 16, FS = 12, fonts = [F, FS, F], dys = [0, 5, 0];
+    ctx.save(); ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.fillStyle = col; ctx.strokeStyle = '#000000'; ctx.lineWidth = 4;
+    const ws = parts.map((t, i) => { ctx.font = fonts[i] + 'px "Share Tech Mono", monospace'; return ctx.measureText(t).width; });
+    const W = ws[0] + ws[1] + ws[2];
+    let px = align === 'center' ? x - W / 2 : x;
+    px = Math.max(8, Math.min(pxW - W - 8, px)); y = Math.max(16, Math.min(pxH - 14, y));
+    parts.forEach((t, i) => { if (!t) return; ctx.font = fonts[i] + 'px "Share Tech Mono", monospace'; ctx.strokeText(t, px, y + dys[i]); ctx.fillText(t, px, y + dys[i]); px += ws[i]; });
+    ctx.restore();
+  }
+  // Free body diagram on the Visualize page: the coasting ship, upright and centred, with its weight in kN.
+  // The ship's mass and the Moon's gravity are written at the top.
+  function drawDemoFBD() {
+    const D = demo; if (D.phase !== 'xy') return;
+    const r = D.rec[Math.max(0, Math.min(D.end, Math.round(D.i)))], W = r.m * grav;
+    const Wd = fbdC.width, Hd = fbdC.height, cx = Wd / 2, cy = Hd / 2, MS = 6;
+    fctx.setTransform(1, 0, 0, 1, 0, 0); fctx.clearRect(0, 0, Wd, Hd);
+    fctx.save(); fctx.translate(cx, cy); fctx.scale(MS, -MS); fctx.translate(0, -2.45);   // the craft's centre at the dot
+    fctx.lineJoin = 'round'; fctx.lineCap = 'round'; fctx.lineWidth = 2 / MS;
+    for (const [pts, closed, alpha] of GRACE) {
+      fctx.beginPath(); pts.forEach(([x, y], i) => i ? fctx.lineTo(x, y) : fctx.moveTo(x, y));
+      if (closed) { fctx.closePath(); fctx.globalAlpha = 1; fctx.fillStyle = '#000000'; fctx.fill(); }
+      fctx.globalAlpha = alpha; fctx.strokeStyle = '#FFFFFF'; fctx.stroke();
+    }
+    fctx.restore();
+    // text with a subscript: [main, subscript, rest]; align 'left' or 'center'
+    const F = 42, FS = 30;
+    const sub = (parts, x, y, align) => {
+      fctx.save(); fctx.textBaseline = 'middle'; fctx.textAlign = 'left'; fctx.fillStyle = '#FFFFFF';
+      const fonts = [F, FS, F], dys = [0, 10, 0];
+      const ws = parts.map((p, i) => { fctx.font = fonts[i] + 'px "Share Tech Mono", monospace'; return fctx.measureText(p).width; });
+      let px = align === 'center' ? x - (ws[0] + ws[1] + ws[2]) / 2 : x;
+      parts.forEach((p, i) => { fctx.font = fonts[i] + 'px "Share Tech Mono", monospace'; fctx.fillText(p, px, y + dys[i]); px += ws[i]; });
+      fctx.restore();
+    };
+    sub(['m', 'ship', ' = ' + fmt(Math.round(r.m / 10) * 10) + ' kg'], cx, 38, 'center');
+    sub(['a', 'moon', ' = ' + grav.toFixed(1) + ' m/s/s'], cx, 92, 'center');
+    // the weight arrow, straight down from the centre (one fixed scale)
+    const len = 0.44 * Hd * W / (CFG.fullKg * grav), y1 = cy + len, hd = 18;
+    fctx.save(); fctx.strokeStyle = FCOL; fctx.lineWidth = 5; fctx.lineCap = 'round'; fctx.lineJoin = 'round';
+    fctx.beginPath(); fctx.moveTo(cx, cy); fctx.lineTo(cx, y1); fctx.stroke();
+    fctx.beginPath(); fctx.moveTo(cx - hd * 0.43, y1 - hd * 0.9); fctx.lineTo(cx, y1); fctx.lineTo(cx + hd * 0.43, y1 - hd * 0.9); fctx.stroke();
+    fctx.restore();
+    const ym = cy + len / 2;   // centred beside the arrow
+    sub(['F', 'weight', ' ='], cx + 18, ym - 24, 'left');
+    sub([(W / 1000).toFixed(1) + ' kN', '', ''], cx + 18, ym + 26, 'left');
+    fctx.fillStyle = '#FFFFFF'; fctx.beginPath(); fctx.arc(cx, cy, 5, 0, Math.PI * 2); fctx.fill();
+  }
+  function drawDemo() {
+    const D = demo, V_PX = demo.phase === 'xy' ? 5 : 12, A_PX = 40, f1 = v => (Math.abs(v) < 0.05 ? 0 : v).toFixed(1);
+    const dtDot = DEMO.dotDt, now = D.i, NDOTS = Math.floor(D.tc / dtDot + 1e-6);   // a dot every 0.75 s
+    const at = t => D.rec[Math.min(D.end, Math.round(D.cut + t / DH))];
+    const nDots = now >= D.cut ? Math.min(NDOTS, Math.floor((now - D.cut) * DH / dtDot + 1e-6)) : -1;
+    // x and y replay, drawn like the motion grapher's Visualize view: a grid with its axes crossing at the first
+    // dot (where the engine shut off), the x and y motions as colored circles riding the axes, leaving dots
+    const arrowsOn = D.phase !== 'xy' || D.started;   // the visualization shows no arrows until Start
+    const xy = D.phase === 'xy', XCOL = '#00B4FF', YCOL = '#FFF000';   // very bright blue and yellow
+    const axX = SX(at(D.tc).x), axY = SY(at(0).y);   // y axis through the last dot, x axis through the first
+    if (xy) {
+      const g = 5 * view.scale;   // 5 m squares
+      ctx.save(); ctx.strokeStyle = '#FFFFFF';
+      for (let i = Math.floor(-axX / g); i <= Math.ceil((pxW - axX) / g); i++) {
+        ctx.globalAlpha = i === 0 ? 0.45 : i % 5 === 0 ? 0.14 : 0.07; ctx.lineWidth = i === 0 ? 2 : 1;
+        ctx.beginPath(); ctx.moveTo(axX + i * g, 0); ctx.lineTo(axX + i * g, pxH); ctx.stroke();
+      }
+      for (let j = Math.floor(-axY / g); j <= Math.ceil((pxH - axY) / g); j++) {
+        ctx.globalAlpha = j === 0 ? 0.45 : j % 5 === 0 ? 0.14 : 0.07; ctx.lineWidth = j === 0 ? 2 : 1;
+        ctx.beginPath(); ctx.moveTo(0, axY + j * g); ctx.lineTo(pxW, axY + j * g); ctx.stroke();
+      }
+      ctx.restore();
+    }
+    const shadow = on => { ctx.shadowColor = on ? 'rgba(0,0,0,0.55)' : 'transparent'; ctx.shadowBlur = on ? 6 : 0; ctx.shadowOffsetY = on ? 2 : 0; };
+    // the dots: on the flight path in the first flight; on the two axes, in color, in the x and y replay
+    for (let n = 0; n <= nDots; n++) {
+      const r = at(n * dtDot), px = SX(r.x), py = SY(r.y);
+      ctx.fillStyle = '#FFFFFF'; ctx.beginPath(); ctx.arc(px, py, 4, 0, 7); ctx.fill();   // flight path dots appear as it passes
+      if (!xy) continue;
+      for (const [qx, qy, c] of [[px, axY, XCOL], [axX, py, YCOL]]) {
+        ctx.save(); ctx.fillStyle = c;
+        ctx.beginPath(); ctx.arc(qx, qy, 4.9, 0, 7); ctx.fill();
+        if (c === YCOL) { ctx.strokeStyle = '#000000'; ctx.lineWidth = 1; ctx.stroke(); }   // thin black edge so overlapping yellow dots stay separate
+        ctx.restore();
+      }
+    }
+    const bx = SX(s.x), by = SY(s.y);
+    if (xy && now >= D.cut && now <= D.brake) {
+      ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 0.6; ctx.setLineDash([2, 4]);
+      ctx.beginPath(); ctx.moveTo(bx, axY); ctx.lineTo(bx, by); ctx.moveTo(axX, by); ctx.lineTo(bx, by); ctx.stroke();
+      ctx.setLineDash([]);
+            ctx.restore();
+      // small ships riding the axes at the projected points; they meet at the last dot
+      // the components, dotted: on the axes and on the dot (labeled)
+      if (arrowsOn) demoArrow(bx, axY, s.vx * V_PX, 0, XCOL, '', null, 0, true);
+      if (arrowsOn) demoArrow(axX, by, 0, -s.vy * V_PX, YCOL, '', null, 0, true);
+      {
+        // Each small ship is drawn solid (black inside, so nothing shows through) at half brightness. Where they
+        // overlap their brightness adds, so at the end, on the same spot, they make one full-brightness ship.
+        const m = 0.5 * shipScale(), img = miniShip(m), at2 = [[bx, axY], [axX, by]];
+        const w = img.w, h = img.h;
+        for (const [px, py] of at2) ctx.drawImage(img.mask, px - img.ox, py - img.oy, w, h);
+        ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.5;
+        for (const [px, py] of at2) ctx.drawImage(img.ship, px - img.ox, py - img.oy, w, h);
+        ctx.restore();
+      }
+      if (arrowsOn) demoArrow(bx, by, s.vx * V_PX, 0, XCOL, '', null, 0, true);
+      if (arrowsOn) demoArrow(bx, by, 0, -s.vy * V_PX, YCOL, '', null, 0, true);
+      {   // a third small ship on the flight path itself, full brightness, and the component labels by the axis ships
+        const m = 0.5 * shipScale(), img = miniShip(m);
+        ctx.drawImage(img.mask, bx - img.ox, by - img.oy, img.w, img.h); ctx.drawImage(img.ship, bx - img.ox, by - img.oy, img.w, img.h);
+        subLabel(['v', 'x', ' = ' + f1(s.vx) + ' m/s'], bx, axY + 3.6 * m + 16, XCOL, 'center');   // below the x-axis ship
+        subLabel(['v', 'y', ' = ' + f1(s.vy) + ' m/s'], axX + 5.2 * m + 10, by + 2 * m, YCOL, 'left');   // beside the y-axis ship
+      }
+    }
+    if (game.state === 'flying') {
+      if (arrowsOn) demoArrow(bx, by, s.vx * V_PX, -s.vy * V_PX, '#00FF66', ['v', '', ' = ' + f1(Math.hypot(s.vx, s.vy)) + ' m/s'], 'beyond', 0, false, 2.2);
+      const a = Math.hypot(s.ax, s.ay);
+      if (arrowsOn && D.showA) { const ax0 = bx - 5.1 * shipScale() * (xy ? 0.5 : 1) - 14;   // just left of the ship
+        demoArrow(ax0, by, s.ax * A_PX, -s.ay * A_PX, '#FF7A00', 'a = ' + a.toFixed(2) + ' m/s/s', 'midLeft'); }
+    }
   }
 
   // ---------- loop ----------
   let last = performance.now(), acc = 0;
+  let timeX = 1;   // experimental mode: T speeds time up by 0.25x (to 2x), Shift+T slows it (to 0.25x)
   function frame(now) {
     const dtReal = Math.min(0.1, (now - last) / 1000); last = now;
     // while the crew runs to the ship, the game (and the mission timer) fast-forwards 3x
-    acc += dtReal * (game && game.state === 'landed' && boarding() ? CFG.boardFF : 1);
+    acc += dtReal * timeX * (game && game.state === 'landed' && boarding() ? CFG.boardFF : 1);
     const h = 1 / 120;
     const runFrames = acc >= h && game && !game.paused && !game.msg && $('overlay').hidden && (game.state === 'flying' || game.state === 'landed');
     while (acc >= h) { step(h); acc -= h; }
-    if (runFrames) stepGrains(dtReal * (game.state === 'landed' && boarding() ? CFG.boardFF : 1));
+    if (runFrames) stepGrains(dtReal * timeX * (game.state === 'landed' && boarding() ? CFG.boardFF : 1));
+    if (demo) demoTick(dtReal);
     updateView(); draw(); updateUI(dtReal);
     requestAnimationFrame(frame);
   }
@@ -2136,7 +2943,7 @@ button.primary { border-width: 2.5px; }
     setup('mission'); game.emerge = null; game.state = 'landed';
     Object.assign(game, { score: cp.score, tally: { ...cp.tally }, picked: new Set(cp.picked), fuel: cp.fuel, time: cp.time, cp,
       crews: JSON.parse(JSON.stringify(cp.crews)), pilotDose: cp.pilotDose });
-    Object.assign(s, { x: cp.x, y: cp.site.y + 3.5, vx: 0, vy: 0, rot: 0, ax: 0, ay: 0, alt: 0 });
+    Object.assign(s, { x: cp.x, y: restY(cp.x), vx: 0, vy: 0, rot: 0, ax: 0, ay: 0, alt: 0 });
     Object.assign(game, { hull: cp.hull, hullMax: cp.hullMax, dmgTotal: cp.dmgTotal, upg: new Set(cp.upg), repairLeft: cp.repairLeft, repairTotal: cp.repairTotal, legGone: cp.legGone, faults: { ...cp.faults }, lifeLeft: cp.lifeLeft });
     if (cp.legGone) { startTopple(); game.topple.t = 1; setPose(game.topple.F, game.topple.pf, game.topple.to); game.topple = null; }   // already lying over
     view.close = true; view.landing = false; view.place = true; view.resetY = true;
@@ -2144,6 +2951,7 @@ button.primary { border-width: 2.5px; }
   }
   const tryAgain = () => (game.state === 'over' && game.cp ? fromCheckpoint() : again());
   function spacePressed() {
+    if (!$('overlay').hidden && $('overlay').classList.contains('intro')) { clearMsg(); return begin('mission'); }   // first screen: always start
     if (closeMsg()) return;
     if (game.state === 'intro') return begin('mission');
     if (closeContinue()) return;
@@ -2154,21 +2962,34 @@ button.primary { border-width: 2.5px; }
 
   const ARROWS = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
   window.addEventListener('keydown', e => {
+    // demo-only file: X (after the flight) switches to the visualization; every other game key is ignored
+    if (DEMO_ONLY && demo) {
+      if (e.key === ' ') e.preventDefault();
+      if (e.key.toLowerCase() === 'x' && !e.repeat && demo.phase === 'flown') { demo.phase = 'xy'; demo.i = demo.cut; demo.playing = false; demo.started = false; demoButtons(); }
+      if (e.key !== '`') return;
+    }
     if (e.key === '`') { e.preventDefault(); toggleDev(); return; }
+    if (REAL && e.key.toLowerCase() === 't' && !e.repeat && !(e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName))) {
+      timeX = Math.max(0.25, Math.min(2, timeX + (e.shiftKey ? -0.25 : 0.25))); toast('Time ' + timeX + 'x'); return;
+    }
+    if (REAL && e.key.toLowerCase() === 'z' && !e.repeat && !(e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName))) {
+      zoff = Math.max(-(LAND_H0 + 85) + 50, Math.min(2000, zoff + (e.shiftKey ? -50 : 50)));
+      try { localStorage.setItem('llZoff', zoff); } catch (e) {} view.place = true; view.resetY = true; view.camLow = null; toast('View ' + Math.round(view.close ? landH() : farH()) + ' m tall'); return;
+    }
     if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;   // typing in the dev panel
     if (ARROWS.includes(e.key)) {
       e.preventDefault(); keys.add(e.key);
       if (live() && !e.repeat && e.key === 'ArrowUp') setThrottle(game.throttle + 0.1);
       if (live() && !e.repeat && e.key === 'ArrowDown') setThrottle(game.throttle - 0.1);
     }
-    else if (e.key === ' ') { e.preventDefault(); if (!e.repeat) spacePressed(); }
+    else if (e.key === ' ' || e.key === 'Spacebar' || e.code === 'Space') { e.preventDefault(); if (!e.repeat) spacePressed(); }
     // W: only a fresh press starts the engine, so holding W through a touchdown does not relaunch
     else if (e.key.toLowerCase() === 'w' && !e.repeat && live()) setMain(true);
     else if (e.key.toLowerCase() === 'r' && !e.repeat && game.state !== 'intro') again();
     else if (e.key.toLowerCase() === 'v' && !e.repeat) toggleComp();
     else if (e.key.toLowerCase() === 'a' && !e.repeat) toggleAComp();
     // F: free body diagram on, then with components, then off
-    else if (e.key.toLowerCase() === 'f' && !e.repeat && game.state !== 'intro') { settings.fbd = (settings.fbd + 1) % 3; $('fbd').hidden = !fbdOn(); }
+    else if (e.key.toLowerCase() === 'f' && !e.repeat && !demo && game.state !== 'intro') { settings.fbd = (settings.fbd + 1) % 3; $('fbd').hidden = !fbdOn(); }
   });
   window.addEventListener('keyup', e => { keys.delete(e.key); if (e.key.toLowerCase() === 'w') setMain(false); });
   window.addEventListener('blur', () => {
@@ -2178,7 +2999,20 @@ button.primary { border-width: 2.5px; }
 
   // buttons (clicking one also gives the page keyboard focus)
   $('bMission').addEventListener('click', () => begin('mission'));
+  $('bDetails').addEventListener('click', e => {
+    const show = $('ovGoal').hidden; $('ovGoal').hidden = !show;
+    e.currentTarget.textContent = show ? 'Hide detailed instructions' : 'Show detailed instructions';
+    e.currentTarget.setAttribute('aria-expanded', show); e.currentTarget.blur();
+  });
+  // with touch controls on there is no Space bar: tapping the first screen (not a button) starts the mission
+  $('overlay').addEventListener('pointerdown', e => {
+    if (settings.touch && game.state === 'intro' && !e.target.closest('button')) begin('mission');
+  });
+  $('bDemo').addEventListener('click', startDemo);
   document.querySelectorAll('[data-practice]').forEach(b => b.addEventListener('click', () => begin('practice', +b.dataset.practice)));
+  $('bReal').textContent = REAL ? 'Back to normal map' : 'Experimental: real Moon';
+  $('bReal').addEventListener('click', () => { location.search = REAL ? '' : '?real=1&default=1'; });
+  $('bBuild').hidden = !REAL; $('bBuild').addEventListener('click', () => { location.search = QS.has('default') ? '?real=1&default=1' : '?real=1'; });
   $('bEdu').addEventListener('click', () => {
     settings.edu = !settings.edu;
     $('bEdu').textContent = settings.edu ? 'On' : 'Off'; $('bEdu').setAttribute('aria-pressed', settings.edu);
@@ -2208,7 +3042,7 @@ button.primary { border-width: 2.5px; }
   $('bRestart').addEventListener('click', again);
   $('bContinue').addEventListener('click', () => { $('overlay').hidden = true; });
   $('bMenu').addEventListener('click', showMenu);
-  document.querySelectorAll('button').forEach(b => b.addEventListener('keydown', e => { if (e.key === ' ') { e.preventDefault(); } }));
+  document.querySelectorAll('button').forEach(b => { b.addEventListener('keydown', e => { if (e.key === ' ' || e.code === 'Space') e.preventDefault(); }); b.addEventListener('keyup', e => { if (e.key === ' ' || e.code === 'Space') e.preventDefault(); }); });
 
   // ---------- dev panel (press ` to open or close) ----------
   // Change any setting live (site lengths need "Apply and restart"), place the ship anywhere by clicking, set
@@ -2228,8 +3062,9 @@ button.primary { border-width: 2.5px; }
     dAngLo: 'Debris: flattest angle (deg)', dAngHi: 'Debris: steepest angle (deg)', dStreak: 'Debris: streak length (s)', dPower: 'Debris: grows near ground',
     dAim: 'Debris: tilt effect', dFine: 'Debris: fine dust share (%)', dLarge: 'Debris: large grain share (%)', dFineX: 'Debris: fine dust speed (x)', dVcap: 'Debris: speed cap (m/s)',
     injLarge: 'Injury chance, large grain (%)', faceplate: 'Faceplate cracks, large grain (%)', injMed: 'Injury chance, medium grain (%)', injSmall: 'Injury chance, small grain (%)',
-    suitTear: 'Injuries that tear the suit (%)', zClose: 'Small+medium grains, under 30 m (x)', zPacked: 'Small+medium grains, packed ground (x)', zLoose: 'Small+medium grains, loose ground (x)',
-    airMin: 'Torn suit: least air (s)', airMax: 'Torn suit: most air (s)', downLimit: 'Collapsed: dies after (s)', carryV: 'Carrying speed (m/s)',
+    suitTear: 'Injuries that tear the suit (%)', zClose: 'Small+medium grains, under 30 m (x)', zPacked: 'Small+medium grains, packed ground (x)', zLoose: 'Small+medium grains, loose ground (x)', zLargePacked: 'Large grains, packed ground (x)',
+    airMin: 'Torn suit: least air (s)', airMax: 'Torn suit: most air (s)', carryV: 'Carrying speed (m/s)', seriousV: 'Seriously injured speed (m/s)', tetherV: 'Tether haul speed (m/s)',
+    verySickAt: 'Very sick at (dose)', veryPts: 'Points lost per very sick person',
     aScale: 'a arrow length, far view (px per m/s/s)', radShelter: 'Radiation in a shelter (per s)', radIn: 'Radiation in the ship (per s)', radOut: 'Radiation outside (per s)', sickAt: 'Radiation sickness at (dose)', radPts: 'Points lost per sick person'
   };
   const devPlace = { vx: 0, vy: -1, tilt: 0, fuel: 100, hull: 60, armed: false };
@@ -2270,12 +3105,41 @@ button.primary { border-width: 2.5px; }
     const leg = el('select'); ['none', 'left', 'right'].forEach((o, i) => leg.append(el('option', { value: [0, -1, 1][i], textContent: 'broken leg: ' + o })));
     leg.value = game.legGone; leg.addEventListener('change', () => { game.legGone = +leg.value; });
     fg.append(leg); d.append(fg);
+    if (REAL) {
+      d.append(el('h3', { textContent: 'Camera (experimental, live)' }));
+      const save = () => { try { localStorage.setItem('llCam3', JSON.stringify(CAM)); } catch (e) {} view.camY = null; view.place = true; };
+      const cg = el('div', { className: 'grid' });
+      const cn = (k, lab, st) => cg.append(el('span', { textContent: lab }), num(CAM[k], st || 1, v => { if (!isNaN(v)) { CAM[k] = v; save(); } }));
+      const cc = (k, lab) => { const c = el('input', { type: 'checkbox', checked: CAM[k] }); c.addEventListener('change', () => { CAM[k] = c.checked; save(); }); cg.append(el('span', { textContent: lab }), c); };
+      const cs = (k, lab, opts) => { const sel = el('select'); for (const [v, t] of opts) sel.append(el('option', { value: v, textContent: t })); sel.value = CAM[k]; sel.addEventListener('change', () => { CAM[k] = sel.value; save(); }); cg.append(el('span', { textContent: lab }), sel); };
+      cc('surface', 'Baseline = local surface (hills left out)'); cn('surfWin', '   look this far each side (m)'); cn('surfPct', '   level: percentile of the ground (low = ignores hills more)');
+      cn('baseOff', 'Baseline lowered below the surface (px)'); cn('maxH', 'Widest view allowed (m)');
+      cn('zoomIn', 'Smooth: landing view below (m above surface)'); cn('zoomOut', 'Smooth: travel view above (m)'); cn('cooldown', 'Smooth: seconds between zoom changes', 0.5);
+      cn('band', 'Smooth: dead zone (% of screen height)'); cn('ease', 'Smooth: catch-up time up/down (s)', 0.1); cn('easeX', 'Smooth: catch-up time sideways (s)', 0.1);
+      cn('look', 'Smooth: look ahead (s of travel)', 0.5); cn('gndMargin', 'Smooth: ground kept above bottom (px)');
+      cn('landH', 'Landing view height (m)'); cn('shelH', 'Shelter view height (m)'); cn('farH', 'Travel view height (m)');
+      cn('inBelow', 'Landing view below (m above pad)'); cn('outAbove', 'Leave landing view above (m)');
+      cc('groundFirst', 'Ground visible beats placement');
+      cs('mode', 'Up and down', [['smooth', 'Smooth (dead zone, eases)'], ['follow', 'Follow the ship'], ['hold', 'Hold still, cut'], ['baseline', 'Baseline fixed on screen']]);
+      cs('anchor', 'At a cut, put this at the height below', [['ship', 'The ship'], ['ground', 'Ground under the ship'], ['baseline', 'The baseline']]);
+      cn('pct', 'That height (% up from the bottom)');
+      cc('topOn', 'Cut: ship within px of the top'); cn('topPx', '   px');
+      cc('botOn', 'Cut: ship within px of the bottom'); cn('botPx', '   px');
+      cc('gndOn', 'Cut: ground within px of the bottom'); cn('gndPx', '   px');
+      cc('climbOn', 'Cut: ship climbed px since last cut'); cn('climbPx', '   px');
+      cc('showRed', 'Red baseline line and readout');
+      d.append(cg);
+      const cr = el('button', { textContent: 'Reset camera' }), cy = el('button', { textContent: 'Copy camera settings' });
+      cr.addEventListener('click', () => { if (!confirm('Reset the camera settings to the built-in values?')) return; Object.assign(CAM, CAM_DEFAULT); save(); buildDev(); });
+      cy.addEventListener('click', () => { const t = 'Lunar Lander camera settings:\n' + JSON.stringify(CAM, null, 1); try { navigator.clipboard.writeText(t); cy.textContent = 'Copied'; setTimeout(() => cy.textContent = 'Copy camera settings', 1500); } catch (e) {} });
+      d.append(el('div', { className: 'btnrow' }, [cy, cr]));
+    }
     // settings
     d.append(el('h3', { textContent: 'Settings (live)' }));
     const sg = el('div', { className: 'grid' });
     for (const k of Object.keys(DEV_LABELS)) sg.append(el('span', { textContent: DEV_LABELS[k] }), num(CFG[k], 'any', v => {
       if (isNaN(v)) return;
-      CFG[k] = v;
+      CFG[k] = v; try { localStorage.setItem('llDevCfg', JSON.stringify(CFG)); } catch (e) {}   // every change is kept
       if (k === 'grav') { WORLDS.Moon = v; if (settings.world === 'Moon') grav = v; }
     }));
     d.append(sg);
@@ -2296,7 +3160,7 @@ button.primary { border-width: 2.5px; }
       catch (e) { try { document.execCommand('copy'); done(); } catch (e2) {} }
     });
     ap.addEventListener('click', () => { try { localStorage.setItem('llDevCfg', JSON.stringify(CFG)); } catch (e) {} location.reload(); });
-    rs.addEventListener('click', () => { try { localStorage.removeItem('llDevCfg'); } catch (e) {} location.reload(); });
+    rs.addEventListener('click', () => { try { localStorage.removeItem('llDevCfg'); localStorage.removeItem('llCam3'); localStorage.removeItem('llZoff'); } catch (e) {} location.reload(); });
     d.append(el('div', { className: 'btnrow' }, [cp, ap, rs]), ta,
       el('div', { className: 'hint', textContent: 'Live settings apply now. "Apply and restart" keeps them (in this browser) and rebuilds the map. Copy the box and paste it to Claude to make them permanent.' }));
   }
@@ -2325,9 +3189,14 @@ button.primary { border-width: 2.5px; }
     settings.touch = on;
     $('touchpad').hidden = !on; document.querySelector('.app').classList.toggle('touch', on);
     $('bTouch').textContent = on ? 'On' : 'Off'; $('bTouch').setAttribute('aria-pressed', on);
+    $('bKbd').textContent = on ? 'Use keyboard' : 'Use touch controls';
     checkOrientation();
   }
   $('bTouch').addEventListener('click', () => setTouch(!settings.touch));
+  // an iPad (newer iPads report themselves as a Mac with a touchscreen) gets a button at the top of the screen
+  // during play to switch between the keyboard and the on-screen controls
+  const IS_IPAD = /iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+  $('bKbd').addEventListener('click', e => { setTouch(!settings.touch); e.currentTarget.blur(); });
   const hold = (id, down, up) => {
     const b = $(id);
     b.addEventListener('pointerdown', e => { e.preventDefault(); try { b.setPointerCapture(e.pointerId); } catch (x) {} b.classList.add('down'); down(); });
@@ -2356,7 +3225,269 @@ button.primary { border-width: 2.5px; }
   document.addEventListener('gesturestart', e => e.preventDefault());   // no pinch-zoom on iPad while playing
 
   new ResizeObserver(() => { resize(); }).observe(stage);
-  resize(); showMenu(); setTouch(settings.touch); requestAnimationFrame(frame);
+  function parseTerrain(text) {
+    const lines = text.replace(/^﻿/, '').split(/\r?\n/).filter(l => l.trim());
+    if (lines.length < 2) return null;
+    const sep = [',', '\t', ';'].sort((a, b) => lines[0].split(b).length - lines[0].split(a).length)[0];
+    const split = l => { const out = []; let cur = '', q = false;
+      for (let i = 0; i < l.length; i++) { const ch = l[i];
+        if (ch === '"') { if (q && l[i + 1] === '"') { cur += '"'; i++; } else q = !q; }
+        else if (ch === sep && !q) { out.push(cur.trim()); cur = ''; } else cur += ch; }
+      out.push(cur.trim()); return out; };
+    const rows = lines.map(split), num = v => v !== '' && isFinite(Number(v));
+    const hasHead = !rows[0].every(num), head = hasHead ? rows[0].map(h => h.toLowerCase()) : [];
+    const data = rows.slice(hasHead ? 1 : 0).filter(r => r.filter(num).length >= 2);
+    if (data.length < 2) return null;
+    const cols = Math.max(...data.map(r => r.length)), numeric = [...Array(cols).keys()].filter(c => data.filter(r => num(r[c])).length >= data.length * 0.5);
+    let di = head.findIndex(h => /dist/.test(h));
+    if (!numeric.includes(di)) di = numeric.length > 2 && head.length ? numeric[2] : numeric[0];
+    const hs = numeric.filter(c => c !== di && !/^(x|y|lat|lon|long|latitude|longitude)$/.test(head[c] || ''));
+    const km = /km/.test(head[di] || '') ? 1000 : 1, found = [];
+    for (const c of hs) {
+      const pts = data.filter(r => num(r[di]) && num(r[c])).map(r => [Number(r[di]) * km, Number(r[c])]).sort((a, b) => a[0] - b[0]);
+      if (pts.length > 9 && pts[pts.length - 1][0] > pts[0][0]) found.push({ n: (hasHead && rows[0][c] ? rows[0][c] : 'Column ' + (c + 1)).replace(/^"+|"+$/g, ''), pts });
+    }
+    if (!found.length) return null;
+    let best = found.findIndex(q => /lola/i.test(q.n) && !/pole/i.test(q.n)); if (best < 0) best = 0;
+    return { cols: found, best };
+  }
+  // ---------- experimental: course builder ----------
+  // Top strip: the whole data file; drag the bright stretch to choose the part you use. Then set the course length and the
+  // mountain height in plain numbers. The overview strip shows your course; the big picture shows the ground at the scale the game
+  // uses (same metres across and up), where shelters go on flat spots. "Fly this course" saves it and reloads the page, which builds the game map.
+  const CB = { c: null, left: 0, vh: 500, exag: 1, px: null, py: null, flats: [], lo: 0, hi: 1, slopeMax: 0, slopeMed: 0, msg: '' };
+  const cbG = () => { const c = CB.c, P = c.pts, d0 = P[0][0], L = P[P.length - 1][0] - d0, b = d0 + c.baseF * L, e = d0 + c.endF * L, W = c.lenKm * 1000; return { d0, L, b, e, W, k: W / (e - b) }; };
+  const cbY = x => {
+    const X = CB.px, Y = CB.py, n = X.length;
+    if (x <= X[0]) return Y[0]; if (x >= X[n - 1]) return Y[n - 1];
+    let lo = 0, hi = n - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (X[m] <= x) lo = m; else hi = m; }
+    return Y[lo] + (Y[hi] - Y[lo]) * ((x - X[lo]) / ((X[hi] - X[lo]) || 1));
+  };
+  const cbRng = x => { let lo = Infinity, hi = -Infinity; for (let d = -75; d <= 75; d += 15) { const y = cbY(x + d); if (y < lo) lo = y; if (y > hi) hi = y; } return hi - lo; };   // height range across a 150 m pad
+  const cbFmt = v => String(Number(v.toPrecision(3)));
+  const cbNice = v => { const p = Math.pow(10, Math.floor(Math.log10(v))), f = v / p; return (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10) * p; };
+  function cbRawRelief() {
+    const g = cbG(), h = heightFn(CB.c.pts, CB.c.smooth); let lo = Infinity, hi = -Infinity;
+    for (let i = 0; i <= 400; i++) { const y = h(g.b + (g.e - g.b) * i / 400); if (y < lo) lo = y; if (y > hi) hi = y; }
+    return { lo, hi, r: Math.max(1, hi - lo) };
+  }
+  // flat spots: places where a 150 m pad would need almost no cutting (height range 20 m or less), at least 500 m apart
+  function cbFlatSpots(W) {
+    const a = 1100, z = W - 200, st = 25, v = [], out = []; if (z <= a) return out;
+    for (let x = a; x <= z; x += st) v.push(cbRng(x));
+    let last = -1e9;
+    for (let i = 0; i < v.length; i++) {
+      if (v[i] > 20) continue;
+      let ok = true; for (let j = Math.max(0, i - 12); j <= Math.min(v.length - 1, i + 12); j++) if (v[j] < v[i] || (v[j] === v[i] && j < i)) { ok = false; break; }
+      if (!ok) continue;
+      const x = a + i * st; if (x - last >= 500) { out.push([x, v[i]]); last = x; }
+    }
+    return out;
+  }
+  let cbSaveT = 0;
+  function cbRebuild() {
+    const c = CB.c, g = cbG();
+    c.vScale = Math.max(0.002, Math.min(10, CB.exag * g.k));   // the vertical scale follows the length, so the course keeps its shape unless the mountain height is set by hand
+    const p = courseProfile(c); CB.px = new Float64Array(p.length); CB.py = new Float64Array(p.length);
+    let lo = Infinity, hi = -Infinity;
+    p.forEach((q, i) => { CB.px[i] = q[0] - 400; CB.py[i] = q[1]; if (i) { lo = Math.min(lo, q[1]); hi = Math.max(hi, q[1]); } });
+    CB.lo = lo; CB.hi = hi;
+    const sl = []; for (let x = 0; x < g.W; x += 25) sl.push(Math.atan(Math.abs(cbY(x + 25) - cbY(x)) / 25) * 180 / Math.PI);
+    sl.sort((a, b) => a - b); CB.slopeMax = sl[sl.length - 1] || 0; CB.slopeMed = sl[sl.length >> 1] || 0;
+    CB.flats = cbFlatSpots(g.W);
+    clearTimeout(cbSaveT); cbSaveT = setTimeout(() => saveCourse(CB.c), 300);
+    cbDraw();
+  }
+  const cbFixShelters = () => { const W = CB.c.lenKm * 1000; CB.c.shelters = CB.c.shelters.filter(f => f * W >= 1100 && f * W <= W - 200); };
+  // move the chosen stretch of data; shelters stay at the same places on the ground where they still fit
+  function cbSetWindow(b, e) {
+    const c = CB.c, g = cbG(), raw = c.shelters.map(f => g.b + f * (g.e - g.b));
+    c.baseF = (b - g.d0) / g.L; c.endF = (e - g.d0) / g.L;
+    const W = c.lenKm * 1000;
+    c.shelters = raw.filter(d => d > b && d < e).map(d => (d - b) / (e - b)).filter(f => f * W >= 1100 && f * W <= W - 200);
+    cbRebuild();
+  }
+  function cbColUI() {
+    const c = CB.c, sel = $('cCol'); sel.innerHTML = '';
+    c.cols.forEach((q, i) => { const o = document.createElement('option'); o.value = i; o.textContent = q.n; sel.append(o); });
+    sel.value = c.col; sel.hidden = c.cols.length < 2; $('cColL').hidden = sel.hidden;
+  }
+  function cbNewCourse(name, parsed) {
+    const cols = parsed.cols.map(q => ({ n: q.n, pts: q.pts })), pts = cols[parsed.best].pts, L = pts[pts.length - 1][0] - pts[0][0];
+    const lenKm = L <= 30000 ? Math.max(3, Number((L / 1000).toPrecision(3))) : 25;
+    return normCourse({ name, cols, col: parsed.best, baseF: 0, endF: 1, lenKm, vScale: lenKm * 1000 / L, shelters: [], smooth: true, rough: 1, seed: 1 });
+  }
+  function showCourse() {
+    CB.c = loadCourse(); CB.exag = CB.c.vScale / cbG().k; CB.left = -150; CB.msg = '';
+    $('course').hidden = false; $('overlay').hidden = true; cbColUI(); cbRebuild();
+  }
+  // ---- pictures ----
+  const cbCnv = id => {
+    const el = $(id), r = el.getBoundingClientRect(), s = 1.5, w = Math.max(10, Math.round(r.width * s)), h = Math.max(10, Math.round(r.height * s));
+    if (el.width !== w || el.height !== h) { el.width = w; el.height = h; }
+    const q = el.getContext('2d'); q.setTransform(1, 0, 0, 1, 0, 0); q.fillStyle = '#000'; q.fillRect(0, 0, w, h); return [q, w, h, s];
+  };
+  const cbFont = (q, s) => { q.font = 18 * s + 'px Helvetica, Arial, sans-serif'; };
+  const cbPreviewDims = () => { const el = $('cDetail'), r = el.getBoundingClientRect(), mpp = CB.vh / Math.max(10, r.height), wM = Math.max(10, r.width) * mpp; return { mpp, wM }; };
+  function cbClampLeft(wM) { const W = CB.c.lenKm * 1000; CB.left = W <= wM ? (W - wM) / 2 : Math.max(-wM * 0.1, Math.min(W - wM * 0.9, CB.left)); }
+  function cbSync() {
+    const c = CB.c, g = cbG(), raw = cbRawRelief(), rawKm = (g.e - g.b) / 1000, f = (g.e - g.b) / g.W, fmax = Math.max(1, (g.e - g.b) / 3000);
+    $('cName').textContent = c.name;
+    $('cLen').value = Math.round(Math.log(c.lenKm / 3) / Math.log(1100 / 3) * 1000); $('cLenV').textContent = cbFmt(c.lenKm) + ' km';
+    $('cSD').value = fmax > 1 ? Math.round(Math.log(Math.max(1, Math.min(fmax, f))) / Math.log(fmax) * 1000) : 0; $('cSDV').textContent = cbFmt(f) + 'x';
+    const rmax = Math.max(3000, raw.r * 3), rel = raw.r * c.vScale;
+    $('cH').value = Math.round(Math.log(Math.max(10, Math.min(rmax, rel)) / 10) / Math.log(rmax / 10) * 1000); $('cHV').textContent = Math.round(rel) + ' m';
+    $('cSm').checked = !!c.smooth; $('cRough').value = Math.round(c.rough * 10); $('cRoughV').textContent = cbFmt(c.rough);
+    $('cInfo').textContent = cbFmt(c.lenKm) + ' km course from ' + cbFmt(rawKm) + ' km of data (' + cbFmt(f) + 'x smaller). Heights ' + Math.round(CB.hi - CB.lo) + ' m. Steepest slope ' + Math.round(CB.slopeMax) + '°, typical ' + Math.round(CB.slopeMed) + '°. Exaggeration ' + cbFmt(CB.exag) + 'x.';
+    $('cSh').textContent = 'Shelters ' + c.shelters.length + ' of 5. ' + CB.msg;
+    for (const b of document.querySelectorAll('#cVH button')) b.setAttribute('aria-pressed', Number(b.dataset.vh) === CB.vh);
+    $('cGo').disabled = false;
+  }
+  function cbDraw() {
+    if (!CB.c || !CB.px || $('course').hidden) return;
+    cbSync();
+    const c = CB.c, g = cbG(), W = g.W, sxs = c.shelters.map(f => f * W).sort((a, b) => a - b);
+    // --- strip A: the whole data file, with the chosen stretch bright ---
+    {
+      const [q, w, h, s] = cbCnv('cAll'), P = c.pts, top = 30 * s, pad = 6 * s;
+      let lo = Infinity, hi = -Infinity; for (const p of P) { if (p[1] < lo) lo = p[1]; if (p[1] > hi) hi = p[1]; } if (hi - lo < 1) hi = lo + 1;
+      const X = d => (d - g.d0) / g.L * w, Y = y => h - pad - (y - lo) / (hi - lo) * (h - top - pad), stp = Math.max(1, Math.floor(P.length / (w / 2)));
+      const line = () => { q.beginPath(); for (let i = 0; i < P.length; i += stp) { const px = X(P[i][0]), py = Y(P[i][1]); i ? q.lineTo(px, py) : q.moveTo(px, py); } q.lineTo(X(P[P.length - 1][0]), Y(P[P.length - 1][1])); q.stroke(); };
+      q.lineJoin = 'round'; q.lineWidth = 1.6 * s; q.strokeStyle = 'rgba(255,255,255,0.3)'; line();
+      q.save(); q.beginPath(); q.rect(X(g.b), 0, X(g.e) - X(g.b), h); q.clip(); q.strokeStyle = '#FFF'; q.lineWidth = 2.2 * s; line(); q.fillStyle = 'rgba(255,255,255,0.10)'; q.fillRect(X(g.b), top, X(g.e) - X(g.b), h - top); q.restore();
+      q.fillStyle = '#FFF'; q.fillRect(X(g.b) - 3 * s, top - 6 * s, 6 * s, h - top + 6 * s); q.fillRect(X(g.e) - 3 * s, top - 6 * s, 6 * s, h - top + 6 * s);
+      cbFont(q, s); q.textAlign = 'left'; q.fillText('Whole file, ' + cbFmt(g.L / 1000) + ' km, heights stretched to fit. Drag the bright stretch to choose the part you use; drag its ends to change it.', 8 * s, 22 * s);
+    }
+    // --- strip B: your course ---
+    {
+      const [q, w, h, s] = cbCnv('cOver'), top = 44 * s, pad = 6 * s, lo = CB.lo, hi = Math.max(CB.hi, CB.lo + 1);
+      const X = x => x / W * w, Y = y => h - pad - (y - lo) / (hi - lo) * (h - top - pad);
+      q.strokeStyle = '#FFF'; q.lineWidth = 1.8 * s; q.lineJoin = 'round'; q.beginPath();
+      for (let px = 0; px <= w; px += 2) { const y = Y(cbY(px / w * W)); px ? q.lineTo(px, y) : q.moveTo(px, y); } q.stroke();
+      q.fillStyle = 'rgba(255,255,255,0.55)'; for (const [x] of CB.flats) { q.beginPath(); q.arc(X(x), Y(cbY(x)), 3 * s, 0, 7); q.fill(); }
+      const { mpp, wM } = cbPreviewDims(); q.strokeStyle = 'rgba(255,255,255,0.85)'; q.lineWidth = 2 * s; q.strokeRect(X(CB.left), 2 * s, Math.max(4 * s, X(CB.left + wM) - X(CB.left)), h - 4 * s);
+      cbFont(q, s); q.fillStyle = '#FFF'; q.textAlign = 'center'; q.fillText('Your course, heights stretched to fit. Click or drag to look along it; dots are flat spots.', w / 2, 22 * s);
+      const mark = (x, label, align) => { const px = X(x), py = Y(cbY(x)) - 3 * s; q.strokeStyle = '#FFF'; q.lineWidth = 2.5 * s; q.beginPath(); q.moveTo(px, py - 16 * s); q.lineTo(px, py); q.moveTo(px - 5 * s, py - 7 * s); q.lineTo(px, py); q.lineTo(px + 5 * s, py - 7 * s); q.stroke(); q.fillStyle = '#FFF'; q.textAlign = align; q.fillText(label, px + (align === 'left' ? 5 : -5) * s, py - 12 * s); };
+      mark(0, 'Base', 'left'); mark(W, 'End', 'right'); sxs.forEach((x, i) => mark(x, String(i + 1), 'left'));
+    }
+    // --- the close-up at game scale ---
+    {
+      const [q, w, h, s] = cbCnv('cDetail'), vh = CB.vh, mpp = vh / h, wM = w * mpp;
+      cbClampLeft(wM); const x0 = CB.left;
+      let sum = 0, n = 0; for (let px = 0; px <= w; px += 8) { sum += cbY(x0 + px * mpp); n++; }
+      const yB = sum / n - 0.4 * vh, Y = y => h - (y - yB) / mpp, X = x => (x - x0) / mpp;
+      cbFont(q, s); q.textAlign = 'left';
+      const st = cbNice(vh / 4); q.lineWidth = 1 * s; q.setLineDash([4 * s, 8 * s]);
+      for (let e = Math.ceil(yB / st) * st; e < yB + vh; e += st) { const py = Y(e); q.strokeStyle = 'rgba(255,255,255,0.18)'; q.beginPath(); q.moveTo(0, py); q.lineTo(w, py); q.stroke(); q.fillStyle = 'rgba(255,255,255,0.6)'; q.textAlign = 'right'; q.fillText(Math.round(e) + ' m', w - 8 * s, py - 4 * s); }
+      q.setLineDash([]);
+      q.strokeStyle = '#FFF'; q.lineWidth = 2 * s; q.lineJoin = 'round'; q.beginPath();
+      for (let px = 0; px <= w; px += 2) { const y = Y(cbY(x0 + px * mpp)); px ? q.lineTo(px, y) : q.moveTo(px, y); } q.stroke();
+      q.fillStyle = 'rgba(255,255,255,0.5)'; for (const [x] of CB.flats) if (x > x0 - 50 && x < x0 + wM + 50) { q.beginPath(); q.arc(X(x), Y(cbY(x)), 5 * s, 0, 7); q.fill(); }
+      const arrow = (x, label) => {
+        const px = X(x), gy = Y(cbY(x)), top = gy - 52 * s; if (px < -80 * s || px > w + 80 * s) return;
+        q.strokeStyle = '#FFF'; q.lineWidth = 2.5 * s; q.beginPath(); q.moveTo(px, top); q.lineTo(px, gy - 8 * s); q.moveTo(px - 7 * s, gy - 18 * s); q.lineTo(px, gy - 8 * s); q.lineTo(px + 7 * s, gy - 18 * s); q.stroke();
+        q.fillStyle = '#FFF'; q.textAlign = 'center'; q.fillText(label, px, top - 6 * s);
+      };
+      arrow(0, 'Base');
+      sxs.forEach((x, i) => { const gy = Y(cbY(x)); q.strokeStyle = '#FFF'; q.lineWidth = 4 * s; q.beginPath(); q.moveTo(X(x - 75), gy); q.lineTo(X(x + 75), gy); q.stroke(); arrow(x, 'Shelter ' + (i + 1)); });
+      if (W >= x0 && W <= x0 + wM) arrow(W, 'End');
+      const bar = cbNice(wM / 6), bx = 24 * s, by = h - 22 * s; q.strokeStyle = '#FFF'; q.lineWidth = 2.5 * s; q.beginPath(); q.moveTo(bx, by); q.lineTo(bx + bar / mpp, by); q.moveTo(bx, by - 6 * s); q.lineTo(bx, by + 6 * s); q.moveTo(bx + bar / mpp, by - 6 * s); q.lineTo(bx + bar / mpp, by + 6 * s); q.stroke();
+      q.fillStyle = '#FFF'; q.textAlign = 'left'; q.fillText(bar >= 1000 ? bar / 1000 + ' km' : bar + ' m', bx, by - 10 * s);
+      q.textAlign = 'left'; q.fillText(cbFmt(Math.max(0, x0) / 1000) + ' km from the base. Same scale across and up, as in the game: ' + vh + ' m tall.', 8 * s, 24 * s);
+    }
+  }
+  // ---- shelters ----
+  function cbSnap(x) {
+    const W = CB.c.lenKm * 1000; let best = null;
+    for (let d = -300; d <= 300; d += 15) { const xx = x + d; if (xx < 1100 || xx > W - 200) continue; const sc = cbRng(xx) + 0.02 * Math.abs(d); if (!best || sc < best[0]) best = [sc, xx]; }
+    return best;
+  }
+  function cbClickShelter(x) {
+    const c = CB.c, W = c.lenKm * 1000, near = c.shelters.findIndex(f => Math.abs(f * W - x) < 100);
+    if (near >= 0) { c.shelters.splice(near, 1); CB.msg = ''; cbRebuild(); return; }
+    if (c.shelters.length >= 5) { CB.msg = 'Five shelters is the most. Click one to remove it.'; cbDraw(); return; }
+    const b = cbSnap(x); if (!b) { CB.msg = 'A shelter needs at least 1.1 km from the base and 200 m from the end.'; cbDraw(); return; }
+    if (c.shelters.some(f => Math.abs(f * W - b[1]) < 400)) { CB.msg = 'Too close to another shelter (at least 400 m apart).'; cbDraw(); return; }
+    c.shelters.push(b[1] / W); CB.msg = b[0] > 40 ? 'That ground is steep: the pad is cut flat into the slope.' : ''; cbRebuild();
+  }
+  function cbSuggest() {
+    const c = CB.c, W = c.lenKm * 1000, a = 1100, z = W - 700; if (z - a < 2000) { CB.msg = 'The course is too short for five shelters.'; cbDraw(); return; }
+    c.shelters = [];
+    for (let i = 0; i < 5; i++) {
+      const s0 = a + (z - a) * i / 5, s1 = a + (z - a) * (i + 1) / 5, cand = CB.flats.filter(f => f[0] >= s0 && f[0] < s1).sort((p, q) => p[1] - q[1])[0];
+      const b = cand ? [0, cand[0]] : cbSnap((s0 + s1) / 2); if (b && !c.shelters.some(f => Math.abs(f * W - b[1]) < 400)) c.shelters.push(b[1] / W);
+    }
+    CB.msg = ''; cbRebuild();
+  }
+  // ---- controls ----
+  {
+    const lenFrom = t => Math.max(3, Math.min(1100, Number((3 * Math.pow(1100 / 3, t / 1000)).toPrecision(3))));
+    $('cLen').addEventListener('input', e => { CB.c.lenKm = lenFrom(Number(e.target.value)); cbFixShelters(); cbRebuild(); });
+    $('cSD').addEventListener('input', e => { const g = cbG(), fmax = Math.max(1, (g.e - g.b) / 3000), f = Math.pow(fmax, Number(e.target.value) / 1000); CB.c.lenKm = Math.max(3, Math.min(1100, Number(((g.e - g.b) / 1000 / f).toPrecision(3)))); cbFixShelters(); cbRebuild(); });
+    $('cH').addEventListener('input', e => { const raw = cbRawRelief(), g = cbG(), rmax = Math.max(3000, raw.r * 3), rel = 10 * Math.pow(rmax / 10, Number(e.target.value) / 1000); CB.exag = (rel / raw.r) / g.k; cbRebuild(); });
+    $('cNat').addEventListener('click', () => { CB.exag = 1; cbRebuild(); });
+    $('cSm').addEventListener('change', e => { CB.c.smooth = e.target.checked; cbRebuild(); });
+    $('cRough').addEventListener('input', e => { CB.c.rough = Number(e.target.value) / 10; cbRebuild(); });
+    $('cShuf').addEventListener('click', () => { CB.c.seed = 1 + Math.floor(Math.random() * 99999); if (!(CB.c.rough > 0)) CB.c.rough = 1; cbRebuild(); });
+    $('cCol').addEventListener('change', e => { const c = CB.c; c.col = Number(e.target.value); c.pts = c.cols[c.col].pts; cbRebuild(); });
+    $('cReg').addEventListener('click', () => { CB.c = normCourse(JSON.parse(JSON.stringify(COURSE_DEFAULT))); CB.exag = 1; CB.left = -150; CB.msg = ''; cbColUI(); cbRebuild(); });
+    $('cFile').addEventListener('change', async e => {
+      const f = e.target.files[0]; if (!f) return;
+      const parsed = parseTerrain(await f.text());
+      if (!parsed) { CB.msg = 'Could not read heights from that file. Send it to Claude to check.'; cbDraw(); return; }
+      CB.c = cbNewCourse(f.name.replace(/\.[^.]+$/, ''), parsed); CB.exag = 1; CB.left = -150; CB.msg = ''; cbColUI(); cbRebuild(); e.target.value = '';
+    });
+    for (const b of document.querySelectorAll('#cVH button')) b.addEventListener('click', () => { CB.vh = Number(b.dataset.vh); cbDraw(); });
+    $('cSug').addEventListener('click', cbSuggest);
+    $('cGo').addEventListener('click', () => {
+      if (!CB.c.shelters.length) { CB.msg = 'Place at least one shelter first: click a flat spot in the big picture.'; cbDraw(); return; }
+      clearTimeout(cbSaveT); saveCourse(CB.c); location.search = QS.has('default') ? '?real=1&fly=1&default=1' : '?real=1&fly=1';
+    });
+    // the whole-file strip: drag the stretch (middle) or its ends
+    const all = $('cAll'); let drag = null, raf = 0;
+    all.addEventListener('pointerdown', e => {
+      const r = all.getBoundingClientRect(), g = cbG(), px = e.clientX - r.left, xb = (g.b - g.d0) / g.L * r.width, xe = (g.e - g.d0) / g.L * r.width, tol = 16;
+      let mode = Math.abs(px - xb) < tol ? 'l' : Math.abs(px - xe) < tol ? 'r' : px > xb && px < xe ? 'm' : 'c';
+      if (mode === 'c') { const w = g.e - g.b, mid = g.d0 + px / r.width * g.L, b = Math.max(g.d0, Math.min(g.d0 + g.L - w, mid - w / 2)); cbSetWindow(b, b + w); mode = 'm'; }
+      const g2 = cbG(); drag = { mode, px0: px, b0: g2.b, e0: g2.e }; all.setPointerCapture(e.pointerId);
+    });
+    all.addEventListener('pointermove', e => {
+      if (!drag) return;
+      const r = all.getBoundingClientRect(), g = cbG(), dd = (e.clientX - r.left - drag.px0) / r.width * g.L, minW = Math.max(3000, g.L * 0.005);
+      let b = drag.b0, en = drag.e0;
+      if (drag.mode === 'm') { const w = drag.e0 - drag.b0; b = Math.max(g.d0, Math.min(g.d0 + g.L - w, drag.b0 + dd)); en = b + w; }
+      else if (drag.mode === 'l') b = Math.max(g.d0, Math.min(drag.e0 - minW, drag.b0 + dd));
+      else en = Math.min(g.d0 + g.L, Math.max(drag.b0 + minW, drag.e0 + dd));
+      if (raf) return; raf = requestAnimationFrame(() => { raf = 0; cbSetWindow(b, en); });
+    });
+    all.addEventListener('pointerup', () => { drag = null; });
+    // the course overview: click or drag to look along the course
+    const ov = $('cOver'); let ovDrag = false;
+    const scrub = e => { const r = ov.getBoundingClientRect(), { wM } = cbPreviewDims(); CB.left = (e.clientX - r.left) / r.width * CB.c.lenKm * 1000 - wM / 2; cbDraw(); };
+    ov.addEventListener('pointerdown', e => { ovDrag = true; ov.setPointerCapture(e.pointerId); scrub(e); });
+    ov.addEventListener('pointermove', e => { if (ovDrag) scrub(e); });
+    ov.addEventListener('pointerup', () => { ovDrag = false; });
+    // the close-up: drag to move along, click to place or remove a shelter, wheel to move along
+    const dt = $('cDetail'); let pan = null;
+    dt.addEventListener('pointerdown', e => { pan = { x: e.clientX, left: CB.left, moved: false }; dt.setPointerCapture(e.pointerId); });
+    dt.addEventListener('pointermove', e => { if (!pan) return; if (Math.abs(e.clientX - pan.x) > 5) pan.moved = true; if (pan.moved) { CB.left = pan.left - (e.clientX - pan.x) * cbPreviewDims().mpp; cbDraw(); } });
+    dt.addEventListener('pointerup', e => {
+      const p = pan; pan = null; if (!p || p.moved) return;
+      const r = dt.getBoundingClientRect(); cbClickShelter(CB.left + (e.clientX - r.left) * cbPreviewDims().mpp);
+    });
+    dt.addEventListener('wheel', e => { e.preventDefault(); const { wM } = cbPreviewDims(); CB.left += (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY) / 100 * wM * 0.1; cbDraw(); }, { passive: false });
+    window.addEventListener('keydown', e => {
+      if ($('course').hidden) return;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { CB.left += (e.key === 'ArrowRight' ? 1 : -1) * cbPreviewDims().wM * (e.shiftKey ? 1 : 0.25); cbDraw(); }
+      e.stopImmediatePropagation(); if (e.key.startsWith('Arrow') || e.key === ' ') e.preventDefault();
+    }, true);
+    window.addEventListener('resize', () => { if (!$('course').hidden) cbDraw(); });
+  }
+  resize(); showMenu(); setTouch(settings.touch); window.focus();
+  if (REAL && !QS.has('fly')) showCourse();
+  if (DEMO_ONLY) { document.title = 'Parabola Demo'; $('dExit').textContent = 'Restart'; startDemo(); }
+  else if (location.hash === '#parabola') startDemo();
+  requestAnimationFrame(frame);
 })();
 </script>
 
