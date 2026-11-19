@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fnet = ma</title>
+<style>
+/* page styles */
+body { height: 100vh; overflow: hidden; }
+.aero-stage { position: absolute; inset: 16px 16px var(--aero-page-bottom) 16px; }
+canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.float { position: absolute; }
+/* everything except the moving object is drawn at 75% size (UI_K in the script must match) */
+.leftcol { transform: scale(.75); transform-origin: top left; }
+.titlebox { transform: scale(.75); transform-origin: top right; }
+.rightcol { transform: scale(.75); transform-origin: bottom right; }
+.leftcol { top: 24px; left: 24px; }   /* width set in layout(): always left of the north arrow */
+.qbox { padding: 10px 16px; font-size: 22px; line-height: 1.35; min-height: 116px; }
+#progress { font-weight: 600; }
+#question { padding-left: 36px; }
+#question { font-size: 22px; }   /* shrunk to fit three lines in layout() */
+b { white-space: nowrap; }
+sub { font-size: .62em; line-height: 0; }
+#howBtn { min-height: 38px; font-size: 18px; }
+.howbox { margin-top: 10px; }
+.howbox #hGo { margin-left: auto; }
+.howbox .hrow { width: 100%; }
+.howbox p { margin: 6px 0; font-size: 22px; }
+.eq32 { font-size: 32px; font-weight: 600; line-height: 1.3; margin: 4px 0; white-space: nowrap; }
+.tok { font-size: 32px; font-weight: 600; line-height: 1.2; min-height: 0; padding: 0 12px; margin: 0 4px 0 0;
+  background: var(--aero-well); border: 2px solid var(--aero-btn-border); }
+.hrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 6px 0; }
+.howbox label { cursor: default; white-space: nowrap; font-size: 22px; }
+.howbox input { font-size: 22px; width: 230px; }
+.howbox input.num { width: 90px; }
+.hmsg { min-height: 1.4em; color: var(--aero-gold); font-weight: 600; font-size: 20px; }
+.qbox p { margin: 0; }
+.feedback { left: 50%; top: 50%; transform: translate(-50%, -50%) scale(.75); font-weight: 700; font-size: 32px; padding: 12px 28px; pointer-events: none; white-space: nowrap; }
+.feedback:empty { display: none; }
+.walkbox { top: 24px; left: 24px; padding: 10px 16px; font-size: 22px; line-height: 1.35; transform: scale(.75); transform-origin: top left; }
+.walkbox[hidden] { display: none; }
+.walkbox p { margin: 0 0 4px; }
+.walkbox .wdone { color: var(--aero-ink-muted); }
+.walkbox input { font-size: 28px; width: 84px; text-align: center; margin: 0 4px; }
+.walkbox input.dirtxt { width: 150px; }
+.walkbox button { min-height: 38px; font-size: 22px; padding: 4px 18px; margin-right: 8px; }
+.walkbox .eq32 { margin: 4px 0; }
+.titlebox { top: 24px; right: 24px; padding: 8px 14px; }
+.titlebox .aero-title { font-size: 1.3rem; }
+.rightcol { right: 24px; bottom: 24px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.btnrow { display: flex; gap: 10px; }
+.centerbtn { left: 50%; bottom: 24px; transform: translateX(-50%) scale(.75); transform-origin: bottom center; }
+.centerbtn button { min-height: 44px; font-size: 20px; padding: 6px 18px; border-color: #9FD3BA; }
+.btnrow button { min-height: 44px; font-size: 20px; padding: 6px 18px; }
+.rightcol .primary { border-color: #9FD3BA; }
+.levelrow { display: flex; gap: 6px; }
+.levelrow button[aria-pressed="true"] { border-color: #9FD3BA; }
+.levelrow button { min-height: 30px; padding: 1px 10px; }
+.tag { font-family: Helvetica, Arial, sans-serif; font-size: 18px; color: var(--aero-ink-muted); letter-spacing: 0; }
+</style>
+<script type="application/json" id="classlive-events">
+{
+  "events": {
+    "level1Done": "finished all 10 questions on Level 1",
+    "level2Done": "finished all 5 questions on Level 2",
+    "level3Done": "finished all 5 questions on Level 3"
+  }
+}
+</script>
+<style>
+/* =====================================================================
+   AeroLab theme v7 (inlined from aerolab-v7.css)
+   ===================================================================== */
+:root {
+  --aero-stage: #0B1C15; --aero-page: #12291F; --aero-surface: #EDE9E0;
+  --aero-panel-fill: linear-gradient(180deg, #F7F4EE 0%, #DFD9CD 100%);
+  --aero-well: #F8F6F1; --aero-raised: #C9C1B1; --aero-raised-hover: #BEB6A5; --aero-raised-active: #B3AA98;
+  --aero-ink: #12291F; --aero-ink-muted: #4A564F; --aero-ink-on-dark: #E8EEEA; --aero-muted-on-dark: #AFC2B8; --aero-link-on-dark: #9FD3BA;
+  --aero-line: #D6CFC2; --aero-line-strong: #BEB6A7; --aero-btn-border: #645C4D;
+  --aero-emerald: #1E5E46; --aero-emerald-hover: #257052; --aero-emerald-active: #12432F; --aero-jade: #1E5E46;
+  --aero-select: rgba(30, 94, 70, .13); --aero-gold: #8A5A00; --aero-gold-soft: #F3E2B3;
+  --aero-disabled: #E3DFD7; --aero-disabled-ink: #545D57;
+  --aero-font-body: "Source Sans 3", system-ui, "Segoe UI", Arial, sans-serif;
+  --aero-font-head: "Zilla Slab", Georgia, "Times New Roman", serif;
+  --aero-font-code: ui-monospace, "SFMono-Regular", "Cascadia Mono", Consolas, monospace;
+  --aero-radius: 10px; --aero-radius-sm: 6px; --aero-control-h: 32px; --aero-page-bottom: 48px;
+  --aero-focus: 0 0 0 2px #FFFFFF, 0 0 0 4px #12291F;
+  color-scheme: light;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { font-size: 18px; }
+body { margin: 0; color: var(--aero-ink-on-dark); background: var(--aero-page); padding-bottom: var(--aero-page-bottom);
+  font-family: var(--aero-font-body); font-size: 18px; line-height: 1.5; letter-spacing: .02em; word-spacing: .08em;
+  font-variant-numeric: lining-nums; -webkit-font-smoothing: antialiased; }
+h1, h2, h3 { font-family: var(--aero-font-head); font-weight: 600; line-height: 1.2; letter-spacing: 0; text-transform: none; margin: 0 0 .35em; }
+h1 { font-size: 1.5rem; } h2 { font-size: 1.2rem; } h3 { font-size: 1rem; }
+p { margin: 0 0 .6em; }
+em, i { font-style: normal; font-weight: 600; }
+.aero-title { font-family: var(--aero-font-head); font-weight: 700; font-size: 1.6rem; line-height: 1.15; letter-spacing: 0; margin: 0; }
+.aero-muted { color: var(--aero-muted-on-dark); }
+:where(.aero-panel, .aero-bar, dialog) .aero-muted { color: var(--aero-ink-muted); }
+.aero-panel, dialog { background: var(--aero-surface); background-image: var(--aero-panel-fill); color: var(--aero-ink); border: 0; border-radius: var(--aero-radius); padding: 12px 16px; }
+.aero-stage { background: var(--aero-stage); border-radius: var(--aero-radius); overflow: hidden; }
+button, .aero-btn { font: inherit; font-weight: 500; line-height: 1.2; min-height: var(--aero-control-h); padding: 3px 12px;
+  border: 1px solid var(--aero-btn-border); border-radius: var(--aero-radius-sm); color: var(--aero-ink); background: var(--aero-raised); cursor: pointer; transition: background-color 100ms ease; }
+button:hover:not(:disabled) { background: var(--aero-raised-hover); }
+button:active:not(:disabled) { background: var(--aero-raised-active); }
+.aero-btn-primary, button.primary, button[aria-pressed="true"] { color: #FFFFFF; font-weight: 700; background: var(--aero-emerald); border-color: var(--aero-emerald-active); }
+.aero-btn-primary:hover:not(:disabled), button.primary:hover:not(:disabled), button[aria-pressed="true"]:hover:not(:disabled) { background: var(--aero-emerald-hover); }
+button:disabled { cursor: not-allowed; color: var(--aero-disabled-ink); background: var(--aero-disabled); border-color: var(--aero-line); font-weight: 400; }
+button:focus-visible { outline: none; box-shadow: var(--aero-focus) !important; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="aero-stage">
+  <canvas id="cv"></canvas>
+  <div class="float leftcol">
+    <div class="aero-panel qbox">
+      <div class="tag" id="progress"></div>
+      <p id="question"></p>
+      <div class="howbox" id="howbox" hidden></div>
+    </div>
+  </div>
+  <div class="aero-panel float walkbox" id="walk" hidden></div>
+  <div class="aero-panel float feedback" id="feedback"></div>
+  <div class="float centerbtn"><button id="checkBtn" class="primary">Check Answer</button></div>
+  <div class="aero-panel float titlebox"><span class="aero-title">F<sub>net</sub> = ma</span></div>
+  <div class="float rightcol">
+    <div class="btnrow">
+      <button id="howBtn" hidden>Show me how</button>
+    </div>
+    <div class="levelrow">
+      <button data-level="1" aria-pressed="true">Level 1</button>
+      <button data-level="2">Level 2</button>
+      <button data-level="3">Level 3</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const MAXF = 20;                      // forces go in 1 N steps, 0 to 20 N
+const DIRS = { N:[0,-1], S:[0,1], E:[1,0], W:[-1,0] };
+const NAMES = { N:"North", S:"South", E:"East", W:"West" };
+const OPP = { N:'S', S:'N', E:'W', W:'E' };
+const LOCKED_COLOR = '#E8B04B';
+
+let level = 1, l1Index = 0, q = null, drag = null;
+let forces = {N:0,S:0,E:0,W:0}, locked = {};
+
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+let W = 0, H = 0, cx = 0, cy = 0, scale = 8, dpr = 1;
+
+function rand(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function sign(d){ return (d==='E'||d==='N') ? 1 : -1; }
+function axisOf(d){ return (d==='E'||d==='W') ? 'x' : 'y'; }
+
+/* ---------------- Level 1: net force questions (10 in order) ----------------
+   1-2   net force in a diagonal direction, any size
+   3     one locked force, opposite the target (overpower it)
+   4     one locked force in the target direction, bigger than the target (cut it back)
+   5     one locked force sideways to the target (cancel it exactly)
+   6-7   two locked forces: one sideways, one along the target axis
+   8-10  a given net force in two directions, one locked force on each axis
+   Every lock is chosen so the question can always be solved.            */
+const L1_COUNT = 10;
+const B = t => `<b>${t}</b>`;
+const LEAD = 'Adjust the forces acting on the object to give it ';
+
+function lockAlong(d, s, type){
+  if (type === 'opp') return { key: OPP[d], value: rand([2,4,6,8]) };
+  return { key: d, value: s + rand([2,4,6]) };
+}
+function lockSideways(d){
+  const keys = axisOf(d)==='x' ? ['N','S'] : ['E','W'];
+  return { key: rand(keys), value: rand([2,4,6,8]) };
+}
+function applyLocks(list){
+  for (const L of list){ locked[L.key] = L.value; forces[L.key] = L.value; }
+}
+function lockNote(){ return Object.keys(locked).length === 1 ? ' The gold force is locked.' : ' The gold forces are locked.'; }
+
+function makeLevel1(i){
+  forces = {N:0,S:0,E:0,W:0}; locked = {};
+  if (i < 2){
+    const ns = rand(['N','S']), ew = rand(['E','W']);
+    q = { kind:'dir', dirs:[ns, ew] };
+    return `${LEAD}a net force to the ${B((NAMES[ns]+NAMES[ew]).toLowerCase())}.`;
+  }
+  if (i < 7){
+    const d = rand(['N','S','E','W']), size = rand([2,4,6,8]);
+    q = { kind:'value', fx:0, fy:0 };
+    if (axisOf(d)==='x') q.fx = sign(d)*size; else q.fy = sign(d)*size;
+    if (i === 2) applyLocks([lockAlong(d, size, 'opp')]);
+    else if (i === 3) applyLocks([lockAlong(d, size, 'same')]);
+    else if (i === 4) applyLocks([lockSideways(d)]);
+    else applyLocks([lockSideways(d), lockAlong(d, size, i === 5 ? 'opp' : 'same')]);
+    return `${LEAD}a net force of ${B(size+' N')} to the ${B(NAMES[d].toLowerCase())}.` + lockNote();
+  }
+  const ns = rand(['N','S']), ew = rand(['E','W']);
+  const sx = rand([2,4,6,8]), sy = rand([2,4,6,8]);
+  q = { kind:'value', fx: sign(ew)*sx, fy: sign(ns)*sy };
+  const types = [['opp','opp'],['opp','same'],['same','same']][i-7];
+  applyLocks([lockAlong(ew, sx, types[0]), lockAlong(ns, sy, types[1])]);
+  return `${LEAD}a net force of ${B(sx+' N')} to the ${B(NAMES[ew].toLowerCase())} and ${B(sy+' N')} to the ${B(NAMES[ns].toLowerCase())}.` + lockNote();
+}
+
+/* ---------------- Levels 2 and 3: mass and acceleration (5 questions each) ----------------
+   Level 2 (one direction)
+     1  small whole numbers, no locks         (m 2-3, a 1-2)
+     2  a bit larger, no locks                (m 2-4, a 2-3)
+     3  decimal acceleration, no locks        (m 2 or 4, a 1.5 or 2.5)
+     4  one locked force opposite the target
+     5  one locked force sideways to the target
+   Level 3 (two directions)
+     1  small numbers, no locks               (m 1-2, a 1-3)
+     2  a bit larger, no locks                (m 2-3, a 1-3)
+     3  one locked force, opposite, on one axis
+     4  one locked force on each axis, both opposite
+     5  one locked force on each axis, one opposite and one the same way
+   Every net force stays at 12 N or less, and every question can be solved.       */
+const MASS_COUNT = 5;
+
+function accelText(){
+  const parts = [];
+  if (q.ax) parts.push(`${B(Math.abs(q.ax).toFixed(1)+' m/s/s')} to the ${B(q.ax>0?'east':'west')}`);
+  if (q.ay) parts.push(`${B(Math.abs(q.ay).toFixed(1)+' m/s/s')} to the ${B(q.ay>0?'north':'south')}`);
+  return `Adjust the forces acting on the ${B(q.m.toFixed(1)+'-kg')} object to give it an acceleration of ${parts.join(' and ')}.`
+    + (Object.keys(locked).length ? lockNote() : '');
+}
+function pick(ms, as, maxF){
+  let m, a;
+  do { m = rand(ms); a = rand(as); } while (!Number.isInteger(m*a) || m*a > maxF);
+  return [m, a];
+}
+
+function makeLevel2(i){
+  forces = {N:0,S:0,E:0,W:0}; locked = {};
+  const d = rand(['N','S','E','W']);
+  let m, a;
+  if (i === 0) [m, a] = pick([2,3], [1,2], 6);
+  else if (i === 1) [m, a] = pick([2,3,4], [2,3], 12);
+  else if (i === 2) [m, a] = pick([2,4], [1.5,2.5], 10);
+  else [m, a] = pick([2,3,4], [1,2], 8);
+  q = { kind:'accel', m, ax: d==='E'?a:d==='W'?-a:0, ay: d==='N'?a:d==='S'?-a:0 };
+  const F = m*a;
+  if (i === 3) applyLocks([lockAlong(d, F, 'opp')]);
+  if (i === 4) applyLocks([lockSideways(d)]);
+  return accelText();
+}
+
+function makeLevel3(i){
+  forces = {N:0,S:0,E:0,W:0}; locked = {};
+  const ns = rand(['N','S']), ew = rand(['E','W']);
+  let m, ax, ay;
+  const ms = i === 0 ? [1,2] : [2,3], as = i === 0 ? [1,2,3] : [1,2,3];
+  do { m = rand(ms); ax = rand(as); ay = rand(as); } while (ax === ay || m*ax > 9 || m*ay > 9);
+  q = { kind:'accel', m, ax: sign(ew)*ax, ay: sign(ns)*ay };
+  const Fx = m*ax, Fy = m*ay;
+  if (i === 2){ rand([0,1]) ? applyLocks([lockAlong(ew, Fx, 'opp')]) : applyLocks([lockAlong(ns, Fy, 'opp')]); }
+  if (i === 3) applyLocks([lockAlong(ew, Fx, 'opp'), lockAlong(ns, Fy, 'opp')]);
+  if (i === 4){
+    const flip = rand([0,1]);
+    applyLocks([lockAlong(ew, Fx, flip ? 'same' : 'opp'), lockAlong(ns, Fy, flip ? 'opp' : 'same')]);
+  }
+  return accelText();
+}
+
+let seen = new Set(), solved = false, levelDone = false;
+
+// tell Class Live (when the sim is inside a lesson page) that a level is finished
+function report(name){ try { if (window.parent !== window) window.parent.postMessage({ classliveEvent: name }, '*'); } catch (_) {} }
+
+function freshText(gen){
+  let text;
+  for (let t = 0; t < 80; t++){
+    text = gen();
+    const key = text.replace(/<[^>]+>/g, '');
+    if (!seen.has(key)){ seen.add(key); return text; }
+  }
+  return text;   // ran out of new questions: allow a repeat
+}
+
+function makeQuestion(){
+  stopAnim();
+  walk = null; wrongCount = 0; walkEl.hidden = true; qcol.style.visibility = '';
+  solved = false; levelDone = false;
+  resetHow();
+  document.getElementById('checkBtn').textContent = 'Check Answer';
+  let text;
+  if (level === 1){
+    text = freshText(() => makeLevel1(l1Index));
+  } else {
+    text = freshText(() => (level === 2 ? makeLevel2 : makeLevel3)(l1Index));
+  }
+  document.getElementById('progress').textContent = `Question ${l1Index+1} of ${levelCount()}`;
+  document.getElementById('question').innerHTML = text;
+  setFeedback('');
+  draw();
+}
+
+function levelCount(){ return level === 1 ? L1_COUNT : MASS_COUNT; }
+
+function nextQuestion(){
+  l1Index = (l1Index + 1) % levelCount();
+  if (l1Index === 0) seen = new Set();
+  makeQuestion();
+}
+
+function setFeedback(t, ok){
+  const f = document.getElementById('feedback');
+  f.textContent = t;
+  f.style.color = ok === undefined ? '' : ok ? 'var(--aero-emerald)' : 'var(--aero-gold)';
+  wrongShown = (ok === false);
+}
+function setLevel(n){
+  level = n;
+  document.querySelectorAll('.levelrow button').forEach(x => x.setAttribute('aria-pressed', +x.dataset.level === n));
+  l1Index = 0;
+  seen = new Set();
+  makeQuestion();
+}
+
+function check(){
+  if (walk){ walkCheck(); return; }
+  if (solved){
+    if (levelDone && level < 3) setLevel(level + 1);   // finished a level: go on to the next one
+    else nextQuestion();
+    return;
+  }
+  const fx = forces.E - forces.W, fy = forces.N - forces.S;
+  let ok;
+  if (q.kind === 'dir'){
+    const want = { x:0, y:0 };
+    for (const d of q.dirs) want[axisOf(d)] = sign(d);
+    ok = Math.sign(fx) === want.x && Math.sign(fy) === want.y;
+  } else if (q.kind === 'value'){
+    ok = fx === q.fx && fy === q.fy;
+  } else {
+    ok = fx === q.m*q.ax && fy === q.m*q.ay;
+  }
+  if (!ok && level === 1 && q.kind === 'value' && Object.keys(locked).length){
+    wrongCount++;
+    if (wrongCount >= 2){ setFeedback(''); startWalk(); return; }   // second wrong Check: walk through the math
+  }
+  levelDone = ok && l1Index === levelCount() - 1;
+  setFeedback(!ok ? 'Not quite. Try again.' : levelDone ? `Correct. You finished Level ${level}.` : 'Correct.', ok);
+  if (ok){
+    solved = true;
+    startAnim(fx, fy);
+    if (levelDone) report(`level${level}Done`);
+    document.getElementById('checkBtn').textContent = !levelDone ? 'Next Question' : level < 3 ? `Go to Level ${level + 1}` : 'Start Level 3 Again';
+  }
+}
+
+function resize(){
+  const r = cv.getBoundingClientRect();
+  dpr = window.devicePixelRatio || 1;
+  W = r.width; H = r.height;
+  cv.width = W*dpr; cv.height = H*dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  layout();
+  draw();
+}
+
+// Keep the question box clear of every place an arrow can be pulled:
+// the box stays left of the north arrow, and the object sits low enough that the west arrow passes under the box.
+const qcol = document.querySelector('.leftcol'), qtext = document.getElementById('question');
+function layout(){
+  cx = W/2;
+  qcol.style.width = Math.max(260, Math.min(600, cx - 130)) / UI_K + 'px';
+  for (let fs = 22; fs >= 16; fs--){            // largest size (22 to 16 px) that fits in three lines
+    qtext.style.fontSize = fs + 'px';
+    if (qtext.scrollHeight <= fs * 1.35 * 3 + 2) break;
+  }
+  const titleW = document.querySelector('.titlebox').offsetWidth * UI_K;
+  walkEl.style.width = Math.max(300, W - 48 - titleW - 16) / UI_K + 'px';   // across the top, left of the title
+  const bottom = Math.max(qcol.offsetTop + qcol.offsetHeight * UI_K,
+                          walkEl.hidden ? 0 : walkEl.offsetTop + walkEl.offsetHeight * UI_K);
+  cy = Math.max(H/2, bottom + 24);
+  const room = Math.min(cy - RO - 44, H - cy - RO - 44, cx - RO - 210);   // up, down, and sideways with the label
+  scale = Math.max(3, room / MAXF);
+}
+const walkEl = document.getElementById('walk');
+const ro = new ResizeObserver(() => { layout(); draw(); }); ro.observe(qcol); ro.observe(walkEl);
+
+const UI_K = 0.75;                   // everything but the object is 25% smaller
+const RO = 32, HEAD = 30*UI_K, DOT = 8*UI_K;   // object radius, arrowhead length, drag-dot radius
+
+function dotPos(k){ const [dx,dy] = DIRS[k], L = RO + forces[k]*scale; return [cx+dx*L, cy+dy*L]; }
+
+/* ---------------- animation after a correct answer ----------------
+   The object (with its arrows) speeds up from rest along the net force and runs off the field.
+   A bigger net force means a bigger acceleration. Mass is not used here. */
+let ox = 0, oy = 0, animId = 0;
+const SLOW = 0.5;                  // the motion plays at half speed
+function stopAnim(){ if (animId) cancelAnimationFrame(animId); animId = 0; ox = 0; oy = 0; }
+function startAnim(fx, fy){
+  stopAnim();
+  const mag = Math.hypot(fx, fy); if (!mag) return;
+  const ux = fx/mag, uy = -fy/mag;               // screen y points down, north is up
+  const acc = 60 + 25*mag;                        // pixels per second per second
+  const t0 = performance.now();
+  (function step(now){
+    const real = (now - t0)/1000, t = real*SLOW, d = 0.5*acc*t*t;
+    ox = ux*d; oy = uy*d;
+    draw();
+    const gone = cx+ox < -250 || cx+ox > W+250 || cy+oy < -250 || cy+oy > H+250;
+    animId = (gone || real > 14) ? 0 : requestAnimationFrame(step);
+  })(t0);
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  ctx.save(); ctx.translate(ox, oy);
+  drawScene();
+  ctx.restore();
+  if (walk) walkLive();
+}
+
+function drawScene(){
+  // object
+  ctx.beginPath(); ctx.arc(cx,cy,RO,0,Math.PI*2);
+  ctx.fillStyle = '#D2CBBD'; ctx.fill();
+  ctx.lineWidth = 3; ctx.strokeStyle = '#000000'; ctx.stroke();
+  if (q && q.m){
+    ctx.fillStyle = '#12291F'; ctx.font = '18px Helvetica, Arial, sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(q.m.toFixed(1), cx, cy - 9);   // two lines so it fits inside the object
+    ctx.fillText('kg', cx, cy + 10);
+  }
+  for (const k of ['N','S','E','W']){
+    const [dx,dy] = DIRS[k], [px,py] = dotPos(k), f = forces[k];
+    const isLocked = k in locked;
+    const col = isLocked ? LOCKED_COLOR : '#E8EEEA';
+    if (f > 0){
+      // arrow runs from the object's edge to the dot; the dot sits on the arrow's point
+      const hl = Math.min(HEAD, Math.max(8, f*scale)), hw = Math.min(14*UI_K, hl*0.6);
+      const bx = px-dx*hl, by = py-dy*hl;                    // base of the head
+      ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 5*UI_K;
+      if (f*scale > hl){ ctx.beginPath(); ctx.moveTo(cx+dx*RO, cy+dy*RO); ctx.lineTo(bx, by); ctx.stroke(); }
+      ctx.beginPath(); ctx.moveTo(px,py);
+      ctx.lineTo(bx-dy*hw, by+dx*hw); ctx.lineTo(bx+dy*hw, by-dx*hw); ctx.closePath(); ctx.fill();
+      ctx.font = (18*UI_K)+'px Helvetica, Arial, sans-serif';
+      const txt = `${f} N ${NAMES[k]}${isLocked ? ' (locked)' : ''}`, gap = DOT+8;
+      if (k==='N'){ ctx.textAlign='center'; ctx.textBaseline='bottom'; ctx.fillText(txt, px, py-gap); }
+      if (k==='S'){ ctx.textAlign='center'; ctx.textBaseline='top'; ctx.fillText(txt, px, py+gap); }
+      if (k==='E'){ ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.fillText(txt, px+gap, py); }
+      if (k==='W'){ ctx.textAlign='right'; ctx.textBaseline='middle'; ctx.fillText(txt, px-gap, py); }
+    }
+    if (!isLocked){
+      ctx.beginPath(); ctx.arc(px, py, drag===k ? DOT+2 : DOT, 0, Math.PI*2);
+      ctx.fillStyle = '#A31F1F'; ctx.fill();
+      ctx.lineWidth = 2.5*UI_K; ctx.strokeStyle = '#000000'; ctx.stroke();
+    }
+  }
+}
+
+
+/* ---------------- walkthrough after the second wrong Check (Level 1, locked forces) ----------------
+   Per wrong axis: add the forces with signs, pick the direction, write the net force (each with a reveal),
+   then ask what force is needed for the target; if that fails, drag the force and do the math. */
+let walk = null, wrongCount = 0;
+const AX = {
+  x:{ pos:'E', neg:'W', posN:'east',  negN:'west'  },
+  y:{ pos:'N', neg:'S', posN:'north', negN:'south' }
+};
+const sg = n => n > 0 ? '+' + n : n < 0 ? '−' + (-n) : '0';
+function parseNum(v){
+  v = String(v).replace(/[−–—]/g,'-').replace(/\s+/g,'');
+  return /^[+-]?\d+(\.\d+)?$/.test(v) ? Number(v) : NaN;
+}
+const dirOf = (ax, n) => n > 0 ? AX[ax].posN : AX[ax].negN;
+const netDesc = (ax, T) => T === 0 ? '0 N' : `${Math.abs(T)} N to the ${dirOf(ax, T)}`;
+const axisNet = ax => forces[AX[ax].pos] - forces[AX[ax].neg];
+const wkMsg = t => { const m = document.getElementById('wkMsg'); if (m) m.textContent = t; };
+function wkBtn(t){ document.getElementById('checkBtn').textContent = t; }
+
+function startWalk(){
+  const tasks = [];
+  for (const ax of ['x','y']){
+    const T = ax === 'x' ? q.fx : q.fy;
+    if (axisNet(ax) !== T) tasks.push({ ax, T });
+  }
+  walk = { tasks, ti:-1, steps:[], si:0, done:[], tries:0, revealed:false, endAfter:false, dragOK:false };
+  qcol.style.visibility = 'hidden';
+  walkEl.hidden = false;
+  nextTask();
+}
+
+function nextTask(){
+  walk.ti++;
+  if (walk.ti >= walk.tasks.length){ endWalk(); return; }
+  const { ax, T } = walk.tasks[walk.ti], a = AX[ax];
+  const P = forces[a.pos], Nn = forces[a.neg], net = P - Nn;
+  const steps = [];
+  steps.push({ type:'sum', terms:[P, -Nn, net], blank:[1,1,1], tries:2, fail:'reveal',
+    intro:`Treat the force pointing ${a.negN} as negative and the force pointing ${a.posN} as positive.`,
+    ask:`Add the ${a.posN} and ${a.negN} forces:` });
+  if (net !== 0){
+    steps.push({ type:'dir', ax, value:net, what:'net force' });
+    steps.push({ type:'write', ax, value:net, what:'net force' });
+  }
+  const kL = a.pos in locked ? a.pos : a.neg in locked ? a.neg : null;
+  if (kL){
+    const Ls = kL === a.pos ? locked[kL] : -locked[kL];
+    const sF = T - Ls, kF = kL === a.pos ? a.neg : a.pos;
+    steps.push({ type:'sum', terms:[Ls, sF, T], blank:[0,1,0], tries:2, fail:'drag', ax, kF, T, sF,
+      intro:`What force would you need to add to give the object a net force of ${netDesc(ax, T)}?`,
+      ask:'Fill in the missing force:' });
+    if (sF !== 0){
+      steps.push({ type:'dir', ax, value:sF, what:'force' });
+      steps.push({ type:'write', ax, value:sF, what:'force' });
+    }
+  }
+  walk.steps = steps; walk.si = 0; walk.done = [];
+  renderWalk();
+}
+
+function renderWalk(){
+  const s = walk.steps[walk.si], a = AX[s.ax || 'x'];
+  walk.tries = s.tries || 1; walk.revealed = false; walk.dragOK = (s.type === 'drag'); s.choice = null;
+  let h = '';
+  for (const l of walk.done.slice(-2)) h += `<p class="wdone">${l}</p>`;
+  if (s.intro) h += `<p>${s.intro}</p>`;
+  if (s.type === 'sum'){
+    const t = i => s.blank[i] ? `<input id="wk${i}" autocomplete="off">` : sg(s.terms[i]);
+    h += `<p>${s.ask}</p><div class="eq32">${t(0)} + ${t(1)} = ${t(2)}</div>`;
+  } else if (s.type === 'dir'){
+    const A = AX[s.ax];
+    h += `<p>A ${s.what} of ${sg(s.value)} N points:</p><div><button data-d="pos">${A.posN[0].toUpperCase()+A.posN.slice(1)}</button>` +
+         `<button data-d="neg">${A.negN[0].toUpperCase()+A.negN.slice(1)}</button></div>`;
+  } else if (s.type === 'write'){
+    h += `<div class="eq32">Write the ${s.what}: <input id="wkn" autocomplete="off"> N <input class="dirtxt" id="wkd" autocomplete="off"></div>`;
+  } else if (s.type === 'drag'){
+    h += `<p>Drag the ${NAMES[s.kF].toLowerCase()} force until the net force is ${netDesc(s.ax, s.T)}.</p><div class="eq32" id="wkLive"></div>`;
+  }
+  h += '<div class="hmsg" id="wkMsg"></div>';
+  walkEl.innerHTML = h;
+  wkBtn('Check Answer');
+  const first = walkEl.querySelector('input'); if (first) first.focus();
+  layout(); draw();
+}
+
+walkEl.addEventListener('click', e => {
+  const b = e.target.closest('button[data-d]'); if (!b || !walk || walk.revealed) return;
+  walk.steps[walk.si].choice = b.dataset.d;
+  walkEl.querySelectorAll('button[data-d]').forEach(x => x.setAttribute('aria-pressed', x === b));
+});
+walkEl.addEventListener('keydown', e => { if (e.key === 'Enter' && walk) check(); });
+
+function walkLive(){
+  const el = document.getElementById('wkLive'), s = walk && walk.steps[walk.si];
+  if (!el || !s || !s.ax) return;
+  const n = axisNet(s.ax);
+  el.textContent = `Net force: ${sg(n)} N` + (n ? ` (${dirOf(s.ax, n)})` : '');
+}
+
+function finishStep(){
+  const s = walk.steps[walk.si];
+  if (s.type === 'sum') walk.done.push(`${sg(s.terms[0])} + ${sg(s.terms[1])} = ${sg(s.terms[2])}`);
+  if (s.type === 'dir') walk.done.push(`${sg(s.value)} N points ${dirOf(s.ax, s.value)}.`);
+  if (s.type === 'write') walk.done.push(`The ${s.what} is ${Math.abs(s.value)} N ${dirOf(s.ax, s.value)}.`);
+  if (walk.endAfter){ endWalk(); nextQuestion(); return; }
+  walk.si++;
+  if (walk.si >= walk.steps.length) nextTask(); else renderWalk();
+}
+
+function reveal(s, text){
+  walk.revealed = true;
+  if (s.type === 'sum') s.blank.forEach((b,i) => { if (b){ const f = document.getElementById('wk'+i); f.value = sg(s.terms[i]); f.readOnly = true; } });
+  if (s.type === 'write'){
+    const n = document.getElementById('wkn'), d = document.getElementById('wkd');
+    n.value = Math.abs(s.value); d.value = dirOf(s.ax, s.value); n.readOnly = d.readOnly = true;
+  }
+  if (s.type === 'dir'){
+    walkEl.querySelectorAll('button[data-d]').forEach(x => x.setAttribute('aria-pressed', x.dataset.d === (s.value > 0 ? 'pos' : 'neg')));
+  }
+  wkMsg(text + ' Press Continue.');
+  wkBtn('Continue');
+}
+
+function walkCheck(){
+  const s = walk.steps[walk.si];
+  if (walk.revealed){ finishStep(); return; }
+  if (s.type === 'sum'){
+    const ok = s.blank.every((b,i) => !b || parseNum(document.getElementById('wk'+i).value) === s.terms[i]);
+    if (ok){ finishStep(); return; }
+    if (--walk.tries > 0){ wkMsg('Not quite. Check the signs and try again.'); return; }
+    if (s.fail === 'drag'){
+      walk.steps.splice(walk.si + 1);
+      walk.steps.push({ type:'drag', ax:s.ax, kF:s.kF, T:s.T, need:Math.abs(s.sF), tries:2 });
+      walk.si++; renderWalk(); return;
+    }
+    if (s.fail === 'end') walk.endAfter = true;
+    reveal(s, 'Here is the answer.'); return;
+  }
+  if (s.type === 'dir'){
+    if (!s.choice){ wkMsg('Pick a direction.'); return; }
+    if (s.choice === (s.value > 0 ? 'pos' : 'neg')){ finishStep(); return; }
+    reveal(s, `A ${sg(s.value)} N ${s.what} points ${dirOf(s.ax, s.value)}.`); return;
+  }
+  if (s.type === 'write'){
+    const n = parseNum(document.getElementById('wkn').value), d = document.getElementById('wkd').value.trim().toLowerCase();
+    const want = dirOf(s.ax, s.value);
+    if (n === Math.abs(s.value) && (d === want || d === want[0])){ finishStep(); return; }
+    reveal(s, `The ${s.what} is ${Math.abs(s.value)} N ${want}.`); return;
+  }
+  if (s.type === 'drag'){
+    if (axisNet(s.ax) === s.T){
+      walk.dragOK = false;
+      const a = AX[s.ax], P = forces[a.pos], Nn = forces[a.neg];
+      walk.done.push(`Net force: ${sg(P - Nn)} N`);
+      walk.steps.push({ type:'sum', terms:[P, -Nn, P - Nn], blank:[1,1,1], tries:2, fail:'end',
+        intro:'Now go through the math.', ask:'Add the two forces:', ax:s.ax });
+      walk.si++; renderWalk(); return;
+    }
+    if (--walk.tries > 0){ wkMsg('Not quite. Keep adjusting.'); return; }
+    forces[s.kF] = s.need; walk.dragOK = false; walk.endAfter = true; draw();
+    reveal(s, `The ${NAMES[s.kF].toLowerCase()} force needs to be ${s.need} N.`);
+  }
+}
+
+function endWalk(){
+  walk = null; wrongCount = 0;
+  walkEl.hidden = true; qcol.style.visibility = '';
+  wkBtn('Check Answer');
+  setFeedback(''); layout(); draw();
+}
+
+/* ---------------- dragging the dots ---------------- */
+function cpos(e){ const r = cv.getBoundingClientRect(); return [e.clientX-r.left, e.clientY-r.top]; }
+function hitDot(x, y){
+  let best = null, bd = 30;
+  for (const k in DIRS){
+    if (k in locked) continue;
+    const [px,py] = dotPos(k), d = Math.hypot(x-px, y-py);
+    if (d < bd){ bd = d; best = k; }
+  }
+  return best;
+}
+cv.addEventListener('pointerdown', e => {
+  if (solved || (walk && !walk.dragOK)) return;
+  const [x,y] = cpos(e), k = hitDot(x,y);
+  if (!k) return;
+  drag = k;
+  try { cv.setPointerCapture(e.pointerId); } catch (_) {}
+  cv.style.cursor = 'grabbing';
+  draw();
+});
+cv.addEventListener('pointermove', e => {
+  const [x,y] = cpos(e);
+  if (drag){
+    const [dx,dy] = DIRS[drag];
+    const along = (x-cx)*dx + (y-cy)*dy - RO;
+    const f = Math.max(0, Math.min(MAXF, Math.round(along/scale)));
+    if (f !== forces[drag]){ forces[drag] = f; setFeedback(''); }
+    draw();
+  } else {
+    cv.style.cursor = (!solved && !(walk && !walk.dragOK) && hitDot(x,y)) ? 'grab' : 'default';
+  }
+});
+function endDrag(){ drag = null; cv.style.cursor = 'default'; draw(); }
+cv.addEventListener('pointerup', endDrag);
+cv.addEventListener('pointercancel', endDrag);
+
+/* ---------------- Level 2 "Show me how" ---------------- */
+const FN = 'F<sub>net</sub>';
+const howBox = document.getElementById('howbox'), howBtn = document.getElementById('howBtn');
+let how = null;
+
+function isEquation(t){
+  const n = t.toLowerCase().replace(/[\s·⋅×*._()σ∑x]/g, '').replace(/net/g, '');
+  return ['f=ma', 'f=am', 'ma=f', 'am=f'].includes(n);
+}
+function numIs(str, target){
+  const v = parseFloat(String(str).replace(',', '.'));
+  return isFinite(v) && Math.abs(v - target) < 0.05;
+}
+function howVals(){
+  const a = Math.abs(q.ax || q.ay);
+  return { m:q.m, a, F:q.m*a, dir: q.ax>0 ? 'east' : q.ax<0 ? 'west' : q.ay>0 ? 'north' : 'south' };
+}
+function resetHow(){
+  how = null; howBox.hidden = true; howBox.innerHTML = '';
+  howBtn.hidden = (level !== 2); howBtn.textContent = 'Show me how';
+}
+howBtn.onclick = () => {
+  if (howBox.hidden){ how = { step:'eq1', msg:'' }; howBox.hidden = false; howBtn.textContent = 'Hide help'; renderHow(); }
+  else resetHow();
+};
+
+function renderHow(){
+  const v = howVals(), s = how.step, msg = `<div class="hmsg" id="hMsg">${how.msg || ''}</div>`;
+  let h = '';
+  if (s === 'eq1' || s === 'eq2'){
+    h = `<p>${s === 'eq1' ? 'What equation do you need to solve this?' : 'What equation relates acceleration, mass and force?'}</p>
+      <div class="hrow"><input id="hIn" type="text" autocomplete="off" aria-label="Equation"><button class="primary" id="hGo">Check</button></div>${msg}`;
+  } else if (s === 'reveal'){
+    h = `<p>The equation is <b>${FN} = ma</b>.</p><div class="hrow"><button class="primary" id="hGo">Continue</button></div>`;
+  } else if (s === 'click'){
+    h = `<div class="eq32"><button class="tok" data-v="F">${FN}</button> = <button class="tok" data-v="m">m</button><button class="tok" data-v="a">a</button></div>
+      <p>Click on what you are trying to find.</p>${msg}`;
+  } else if (s === 'fill'){
+    h = `<div class="eq32">${FN} = ?</div><p>Fill in the mass and the acceleration.</p>
+      <div class="hrow"><label>m = <input id="hM" class="num" inputmode="decimal" autocomplete="off"> kg</label>
+      <label>a = <input id="hA" class="num" inputmode="decimal" autocomplete="off"> m/s/s</label></div>
+      <div class="hrow"><button class="primary" id="hGo">Check</button></div>${msg}`;
+  } else if (s === 'solve'){
+    h = `<div class="eq32">${FN} = ma</div><div class="eq32">${FN} = (${v.m.toFixed(1)} kg)(${v.a.toFixed(1)} m/s/s)</div><p>Solve for ${FN}.</p>
+      <div class="hrow"><label>${FN} = <input id="hF" class="num" inputmode="decimal" autocomplete="off"> N</label><button class="primary" id="hGo">Check</button></div>${msg}`;
+  } else {
+    h = `<div class="eq32">${FN} = (${v.m.toFixed(1)} kg)(${v.a.toFixed(1)} m/s/s) = ${v.F} N</div>
+      <p>Now adjust the forces acting on the object to give it a net force of ${B(v.F + ' N')} to the ${B(v.dir)}.</p>`;
+  }
+  howBox.innerHTML = h;
+  howBox.querySelectorAll('input').forEach(i => i.addEventListener('keydown', e => {
+    if (e.key === 'Enter'){ e.preventDefault(); howGo(); }
+  }));
+  const go = howBox.querySelector('#hGo'); if (go) go.onclick = howGo;
+  howBox.querySelectorAll('.tok').forEach(b => b.onclick = () => howTok(b.dataset.v));
+  const first = howBox.querySelector('input'); if (first) first.focus();
+}
+function howSet(step, msg){ how.step = step; how.msg = msg || ''; renderHow(); }
+function howMsg(t){ const m = document.getElementById('hMsg'); if (m) m.textContent = t; }
+function howVal(id){ const e = howBox.querySelector(id); return e ? e.value : ''; }
+
+function howGo(){
+  const v = howVals(), s = how.step;
+  if (s === 'eq1'){ if (isEquation(howVal('#hIn'))) howSet('click'); else howSet('eq2', 'Not quite.'); }
+  else if (s === 'eq2'){ if (isEquation(howVal('#hIn'))) howSet('click'); else howSet('reveal'); }
+  else if (s === 'reveal'){ howSet('click'); }
+  else if (s === 'fill'){
+    if (!numIs(howVal('#hM'), v.m)) howMsg('Check the mass in the question.');
+    else if (!numIs(howVal('#hA'), v.a)) howMsg('Check the acceleration in the question.');
+    else howSet('solve');
+  }
+  else if (s === 'solve'){
+    if (numIs(howVal('#hF'), v.F)) howSet('done');
+    else howMsg('Not quite. Multiply the mass by the acceleration.');
+  }
+}
+function howTok(t){
+  if (t === 'F') howSet('fill');
+  else howMsg('The question gives you the mass and the acceleration. What is missing?');
+}
+
+document.getElementById('checkBtn').onclick = check;
+// "Not quite" closes when the student clicks anywhere
+let wrongShown = false;
+document.addEventListener('pointerdown', () => { if (wrongShown) setFeedback(''); }, true);
+document.querySelectorAll('.levelrow button').forEach(b => b.onclick = () => setLevel(+b.dataset.level));
+window.addEventListener('resize', resize);
+makeQuestion(); resize();
+</script>
+</body>
+</html>
