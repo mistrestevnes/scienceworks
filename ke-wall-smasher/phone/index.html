@@ -676,7 +676,7 @@
   }
   function countBox(){      // left edge, top and unit size (px per SVG unit) of the count text
     var u=TS*1.15, N=ART.numbers, wBlock=(N.smash.w+3+3+12+3*12)*u;      // 15% larger than the menu text
-    return {x:Math.max(10,(W-wBlock)/2), y:(isNarrow() ? Math.min(cannonBox().y-2*L.tile/dpr, Y(WALL_H))-14-3*N.smash.h*u : Y(IMPACT_Y)-SL_R*L.ppm-N.smash.h*u) - 40, u:u};   // raised 40 px   // phone held upright: above the Fire button and the top of the wall so it clears both;   // middle of the screen; the bottom of the text is flush with the top of the slug's path (the slug's top edge when loaded)
+    return {x:Math.max(10,(W-wBlock)/2), y:(W>H ? H/2-N.smash.h*u/2+40 : isNarrow() ? Math.min(cannonBox().y-2*L.tile/dpr, Y(WALL_H))-14-3*N.smash.h*u : Y(IMPACT_Y)-SL_R*L.ppm-N.smash.h*u) - 40, u:u};   // raised 40 px   // phone held upright: above the Fire button and the top of the wall so it clears both;   // middle of the screen; the bottom of the text is flush with the top of the slug's path (the slug's top edge when loaded)
   }
   function drawCount(){
     if(!settleT || !ART.numbers || !NUMIMG.smash) return;
@@ -696,7 +696,7 @@
   function placeUI(){
     var N=ART.numbers, u=TS, cb=cannonBox(), key;
     var fh=L.tile/dpr, fw=fh*220/96;
-    var fl=cb.x+cb.w/2-fw/2, ft=cb.y-fh-fh+15;
+    var fl=cb.x+cb.w/2-fw/2, ft=cb.y-fh-fh+15-fh/2;   // half a block higher
     var cb2=countBox(), rh=N?N.rebuild.h*u:0, rw=N?N.rebuild.w*u:0;
     var rl=W/2, rt=cb2.y+20+2*N.smash.h*cb2.u+rh/2;     // centred on the screen, below the count with one cap height of space (and 20 px higher than it was before the count moved up 40)
     key=[fl,ft,rl,rt,u].join();
